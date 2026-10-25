@@ -390,6 +390,16 @@ test("a chunked body far over the limit has its connection cut", async () => {
     await assert.rejects(chunkedPost(4_000_001 + 65_536 * 4));
 });
 
+test("an error without a usable request id carries id null", async () => {
+    const headers = { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" };
+    const parse = await fetch(BASE, { method: "POST", headers, body: "{" });
+    assert.equal(parse.status, 400);
+    assert.deepEqual(await parse.json(), { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
+    const noMethod = await fetch(BASE, { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 7 }) });
+    assert.equal(noMethod.status, 400);
+    assert.equal((await noMethod.json()).id, 7);
+});
+
 after(() => {
     rmSync(dir, { recursive: true, force: true });
 });

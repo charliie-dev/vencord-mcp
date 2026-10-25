@@ -153,6 +153,8 @@ result of `server/discover` and of `tools/list` for 10 minutes (`ttlMs` 600000).
 | 400         | `-32020`      | A header is missing, is not correct, or does not agree with the body    |
 | 400         | `-32602`      | `_meta` does not have the two necessary fields                          |
 | 400         | `-32022`      | The version is not 2026-07-28, or the method is `initialize`            |
+| 400         | `-32700`      | The body is not JSON                                                    |
+| 400         | `-32600`      | The body is not a JSON-RPC request                                      |
 | 404         | `-32601`      | The method is unknown. `ping` is an unknown method                      |
 | 404         | `-32600`      | The path is not `/mcp`                                                  |
 | 200         | `-32602`      | The tool is unknown                                                     |
@@ -162,7 +164,8 @@ result of `server/discover` and of `tools/list` for 10 minutes (`ttlMs` 600000).
 | 413         | `-32600`      | The body has more than 1,000,000 bytes                                  |
 | 202         | none          | The message is a notification. The endpoint does not use it             |
 
-The `-32022` error has `data.supported` (the versions of the endpoint) and `data.requested`.
+The `-32022` error has `data.supported` (the versions of the endpoint) and `data.requested`. If
+the endpoint cannot find the request ID, the error has `id: null`.
 
 If the body has more than 4,000,000 bytes, the endpoint does not send 413. It closes the
 connection.

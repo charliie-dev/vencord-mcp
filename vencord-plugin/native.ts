@@ -645,7 +645,8 @@ function send(res: ServerResponse, status: number, body?: unknown, headers: Reco
     res.end(JSON.stringify(body));
 }
 
-const rpcError = (code: number, message: string) => ({ jsonrpc: "2.0", error: { code, message } });
+// JSON-RPC 2.0: when the request id cannot be determined, the error response carries id null.
+const rpcError = (code: number, message: string, id: string | number | null = null) => ({ jsonrpc: "2.0", id, error: { code, message } });
 
 // An oversized body is read to the end and discarded: answering or destroying the socket
 // mid-upload resets the connection before the client can read the 413 (measured: an early
@@ -715,8 +716,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         return send(res, 202);
     }
     const { id, method, params } = msg;
-    if ((typeof id !== "string" && typeof id !== "number") || typeof method !== "string") {
+    if (typeof id !== "string" && typeof id !== "number") {
         return send(res, 400, rpcError(-32600, "Invalid Request"));
+    }
+    if (typeof method !== "string") {
+        return send(res, 400, rpcError(-32600, "Invalid Request", id));
     }
 
     try {
@@ -724,7 +728,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         return send(res, 200, { jsonrpc: "2.0", id, result: await handleRpc(method, params) });
     } catch (e: any) {
         if (!(e instanceof RpcFailure)) {
-            return send(res, 500, { jsonrpc: "2.0", id, error: { code: -32603, message: "Internal error" } });
+            console.error(`[mcp] internal error in ${method}:`, e);
+            return send(res, 500, rpcError(-32603, "Internal error", id));
         }
         const error = { code: e.code, message: e.message, ...(e.data === undefined ? {} : { data: e.data }) };
         return send(res, e.status, { jsonrpc: "2.0", id, error });
