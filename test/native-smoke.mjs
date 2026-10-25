@@ -366,6 +366,7 @@ test("tool arguments are checked against the input schema before the renderer se
         [{ name: "get_guild_info", arguments: {} }, /'guild_id' is required/],
         [{ name: "get_guild_info", arguments: { guild_id: 1 } }, /'guild_id' must be a string/],
         [{ name: "list_guilds", arguments: { extra: "x" } }, /unknown argument 'extra'/],
+        [{ name: "join_voice", arguments: { channel_id: "1", guild_id: "2" } }, /unknown argument 'guild_id'/]
     ];
     for (const [params, why] of cases) {
         const { result } = await (await rpc("tools/call", params)).json();

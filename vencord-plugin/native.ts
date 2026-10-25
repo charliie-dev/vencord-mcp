@@ -180,7 +180,7 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
     },
     {
         name: "search_messages",
-        description: "Search messages in a guild or channel",
+        description: "Search messages in a guild or one of its channels (not DMs). Give guild_id, channel_id or both",
         inputSchema: {
             type: "object",
             properties: {
@@ -188,7 +188,7 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
                 channel_id: { type: "string", description: "Channel to search in (narrows guild search)" },
                 query: { type: "string", description: "Search query text" },
                 author_id: { type: "string", description: "Filter by author ID" },
-                limit: { type: "number", description: "Max results (default 25)" }
+                limit: { type: "number", description: "Max results (default 25, max 25)" }
             },
             required: ["query"],
             additionalProperties: false
@@ -283,16 +283,15 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
     },
     {
         name: "join_voice",
-        description: "Join a voice channel",
+        description: "Join a voice or stage channel in a guild",
         inputSchema: {
             type: "object",
             properties: {
                 channel_id: { type: "string", description: "The voice channel ID to join" },
-                guild_id: { type: "string", description: "The guild ID" },
                 self_mute: { type: "boolean", description: "Join muted (default false)" },
                 self_deaf: { type: "boolean", description: "Join deafened (default false)" }
             },
-            required: ["channel_id", "guild_id"],
+            required: ["channel_id"],
             additionalProperties: false
         }
     },

@@ -48,6 +48,9 @@ If a channel is not in the client cache, the plugin gets the channel from the Di
 finds the server of the channel. Archived threads are an example. If the plugin cannot find the
 server, and the channel is not a DM, the call stops with an error.
 
+The plugin finds the server from the channel ID. For `join_voice` and `search_messages`, a server
+ID from the agent cannot change the server that the plugin examines.
+
 If a setting stops a call, the result starts with `You are not allowed to do`. The result also
 gives the tool, the channel or server, and the cause.
 
@@ -65,7 +68,7 @@ settings control which tools operate.
 | `get_channel_info`   | read-only   | Shows the data of one channel. For a thread, it also shows the thread data    |
 | `list_threads`       | read-only   | Shows the threads of a channel. Refer to [Threads](#threads)                  |
 | `read_messages`      | read-only   | Reads the messages of a channel or a thread                                   |
-| `search_messages`    | read-only   | Finds messages in a server with the Discord search function. Not for DMs      |
+| `search_messages`    | read-only   | Finds messages in a server or in one of its channels. Not for DMs             |
 | `list_dms`           | read-only   | Shows your DM channels                                                        |
 | `get_current_user`   | read-only   | Shows the data of your account. It does not show your email address           |
 | `get_user_info`      | read-only   | Shows the data of one user                                                    |
@@ -79,7 +82,7 @@ settings control which tools operate.
 | `add_reaction`       | additive    | Adds a reaction to a message                                                  |
 | `pin_message`        | additive    | Pins a message                                                                |
 | `start_typing`       | additive    | Shows the typing indicator in a channel                                       |
-| `join_voice`         | additive    | Connects to a voice channel                                                   |
+| `join_voice`         | additive    | Connects to a voice channel or a stage channel in a server                    |
 | `edit_message`       | destructive | Replaces the text of one of your messages                                     |
 | `delete_message`     | destructive | Removes a message                                                             |
 | `remove_reaction`    | destructive | Removes your reaction from a message                                          |

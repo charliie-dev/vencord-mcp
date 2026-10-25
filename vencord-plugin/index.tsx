@@ -375,14 +375,19 @@ async function handleAction(action: string, params: any): Promise<any> {
             if (params.channel_id) query.channel_id = params.channel_id;
             query.include_nsfw = true;
 
-            const guildId = params.guild_id || (params.channel_id ? ChannelStore.getChannel(params.channel_id)?.guild_id : null);
-            if (!guildId) throw new Error("Need guild_id or channel_id in a guild");
-            requireGuildScope(guildId, "search_messages");
+            // The channel decides the guild, through the same lookup as the other tools, so an
+            // uncached channel is not mistaken for a DM and a guild_id cannot point elsewhere.
+            let guildId: string | undefined = params.guild_id;
             if (params.channel_id) {
                 const ch = await requireScopeForChannel(params.channel_id, "search_messages");
+                if (!ch.guild_id) throw new Error("search_messages does not search DMs");
+                if (guildId && guildId !== ch.guild_id) throw new Error(`Channel ${params.channel_id} is not in guild ${guildId}`);
+                guildId = ch.guild_id;
                 requireChannelPerm(PermissionsBits.VIEW_CHANNEL, ch, "search_messages", "VIEW_CHANNEL");
                 requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, ch, "search_messages", "READ_MESSAGE_HISTORY");
             }
+            if (!guildId) throw new Error("Need guild_id or channel_id");
+            requireGuildScope(guildId, "search_messages");
 
             const res = await RestAPI.get({
                 url: `/guilds/${guildId}/messages/search`,
@@ -397,7 +402,7 @@ async function handleAction(action: string, params: any): Promise<any> {
                     author: { id: m.author.id, username: m.author.username },
                     content: m.content,
                     timestamp: m.timestamp
-                })).slice(0, params.limit || 25)
+                })).slice(0, clampLimit(params.limit, 25, 25))
             };
         }
 
@@ -541,12 +546,14 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         // ── Voice ────────────────────────────────────────────────────────
+        // The guild comes from the channel, never from the caller, so the allowlist check
+        // applies to the server the client really joins. DM calls are out of scope.
         case "join_voice": {
-            requireGuildScope(params.guild_id, "join_voice");
-            const vc: any = ChannelStore.getChannel(params.channel_id);
-            if (vc) requireChannelPerm(PermissionsBits.CONNECT, vc, "join_voice", "CONNECT");
+            const vc = await requireScopeForChannel(params.channel_id, "join_voice");
+            if (vc.type !== 2 && vc.type !== 13) throw new Error(`Channel ${params.channel_id} is not a voice or stage channel`);
+            requireChannelPerm(PermissionsBits.CONNECT, vc, "join_voice", "CONNECT");
             await VoiceActions.selectVoiceChannel(params.channel_id, {
-                guildId: params.guild_id,
+                guildId: vc.guild_id,
                 selfMute: params.self_mute || false,
                 selfDeaf: params.self_deaf || false
             });
