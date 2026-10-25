@@ -14,10 +14,12 @@ import { checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permiss
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
 const MessageActions = findByPropsLazy("sendMessage", "editMessage", "deleteMessage");
-const TypingActions = findByPropsLazy("startTyping");
-const VoiceActions = findByPropsLazy("selectVoiceChannel");
+// Two props per lookup, as upstream plugins use them, so a lookup cannot match an unrelated
+// module that happens to export one of the names.
+const TypingActions = findByPropsLazy("startTyping", "stopTyping");
+const VoiceActions = findByPropsLazy("selectVoiceChannel", "selectChannel");
 const PresenceStore = findStoreLazy("PresenceStore");
-const DMChannelStore = findByPropsLazy("getPrivateChannelIds");
+const PrivateChannelSortStore = findStoreLazy("PrivateChannelSortStore");
 
 // ── Plugin Settings (Scope-restriction + Readonly + Discord-capability) ───────
 
@@ -445,7 +447,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         // ── DMs ──────────────────────────────────────────────────────────
         case "list_dms": {
             requireDMs("list_dms", scope);
-            const dmIds = DMChannelStore.getPrivateChannelIds();
+            const dmIds = PrivateChannelSortStore.getPrivateChannelIds();
             return dmIds.map((id: string) => {
                 const c = ChannelStore.getChannel(id);
                 if (!c) return { id };
