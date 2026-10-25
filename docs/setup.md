@@ -42,7 +42,8 @@ version in `.node-version`.
    ```
 
    The `deploy` task does these steps:
-   - It copies `index.tsx` and `native.ts` into `$VENCORD_DIR/src/userplugins/MCPBridge`.
+   - It copies `index.tsx`, `native.ts` and `scope.ts` into
+     `$VENCORD_DIR/src/userplugins/MCPBridge`.
    - It installs the Vencord packages with `nub install --frozen-lockfile`.
    - It builds Vencord with `nub run build`. The build goes into `$VENCORD_DIR/dist`.
 
@@ -104,8 +105,8 @@ To change the plugin:
 
 4. Stop Vesktop fully (Cmd+Q). Then start Vesktop again.
 
-A change to `native.ts` has an effect only after Vesktop starts again. For a change to `index.tsx`
-only, a reload of the page (Cmd+R) is sufficient.
+A change to `native.ts` has an effect only after Vesktop starts again. For a change to only
+`index.tsx` or `scope.ts`, a reload of the page (Cmd+R) is sufficient.
 
 To get a new version of Vencord:
 

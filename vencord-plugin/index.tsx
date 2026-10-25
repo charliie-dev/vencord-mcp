@@ -9,6 +9,8 @@ import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, MessageStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
+import { checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permissionTarget, requireChannelScope, requireDMs, requireGuildScope, type Scope, searchGuild, THREAD_TYPES, voiceGuild } from "./scope";
+
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
 const MessageActions = findByPropsLazy("sendMessage", "editMessage", "deleteMessage");
@@ -27,35 +29,13 @@ const settings = definePluginSettings({
     respectDiscordPerms: { type: OptionType.BOOLEAN, description: "Pre-flight with PermissionStore.can()", default: true },
 });
 
-const READ_ACTIONS = new Set([
-    "list_guilds", "get_guild_info", "list_channels", "get_channel_info",
-    "read_messages", "search_messages", "get_current_user", "get_user_info",
-    "list_guild_members", "list_dms", "list_roles", "list_threads"
-]);
-
-const THREAD_TYPES = new Set([10, 11, 12]);
-
-function parseAllowedGuilds(): string[] {
-    return settings.store.allowedGuildIds.split(",").map(s => s.trim()).filter(Boolean);
-}
-
-function describeScope(): string {
-    const g = parseAllowedGuilds();
-    return g.length ? g.join(", ") : "all";
-}
-
-function checkReadonly(action: string) {
-    if (!READ_ACTIONS.has(action) && action !== "connection_status" && settings.store.readonlyMode) {
-        throw new Error(`not-allowed: ${action}: readonlyMode is on. Mutating actions are blocked.`);
-    }
-}
-
-function requireGuildScope(guildId: string | undefined, action: string) {
-    if (!guildId) return;
-    const allowed = parseAllowedGuilds();
-    if (allowed.length && !allowed.includes(guildId)) {
-        throw new Error(`not-allowed: ${action} in guild ${guildId}: not in allowed guilds. Allowed guilds: ${describeScope()}`);
-    }
+// The settings are read again for each call, so a change applies to the next call.
+function currentScope(): Scope {
+    return {
+        readonlyMode: settings.store.readonlyMode,
+        allowDMs: settings.store.allowDMs,
+        allowedGuilds: parseAllowedGuilds(settings.store.allowedGuildIds)
+    };
 }
 
 // Archived threads and channels the client has not loaded are missing from
@@ -68,41 +48,19 @@ async function resolveChannel(channelId: string): Promise<any> {
     return res.body;
 }
 
-async function requireScopeForChannel(channelId: string, action: string) {
+async function requireScopeForChannel(channelId: string, action: string, scope: Scope) {
     const ch: any = await resolveChannel(channelId);
-    const guildId: string | undefined = ch?.guild_id;
-    const isDM = ch?.type === 1 || ch?.type === 3;
-    if (isDM) {
-        if (!settings.store.allowDMs) {
-            throw new Error(`not-allowed: ${action} in DM ${channelId}: DMs are not allowed. Allowed guilds: ${describeScope()}`);
-        }
-        return ch;
-    }
-    if (!guildId) {
-        throw new Error(`not-allowed: ${action} in ${channelId}: cannot determine its guild. Allowed guilds: ${describeScope()}`);
-    }
-    requireGuildScope(guildId, action);
+    requireChannelScope(ch, channelId, action, scope);
     return ch;
-}
-
-// PermissionStore.can() needs a ChannelRecord. A thread fetched over REST is a
-// plain object, so check its parent instead; with no record at all, leave the
-// decision to the API rather than refusing.
-function permissionTarget(channel: any): any {
-    if (!channel) return null;
-    const cached = ChannelStore.getChannel(channel.id);
-    if (cached) return cached;
-    if (THREAD_TYPES.has(channel.type) && channel.parent_id) return ChannelStore.getChannel(channel.parent_id) ?? null;
-    return null;
 }
 
 function requireChannelPerm(perm: any, channel: any, action: string, permName: string) {
     if (!settings.store.respectDiscordPerms) return;
     if (!PermissionStore?.can) return;
-    const target = permissionTarget(channel);
+    const target = permissionTarget(channel, id => ChannelStore.getChannel(id));
     if (!target) return;
     if (!PermissionStore.can(perm, target)) {
-        throw new Error(`not-allowed: ${action} in #${channel?.name ?? channel?.id ?? "unknown"}: missing ${permName}. Allowed guilds: ${describeScope()}`);
+        throw new Error(`not-allowed: ${action} in #${channel?.name ?? channel?.id ?? "unknown"}: missing ${permName}. Allowed guilds: ${describeScope(currentScope())}`);
     }
 }
 
@@ -144,7 +102,7 @@ function requireGuildPerm(perm: any, guildId: string, action: string, permName: 
     const guild = GuildStore.getGuild(guildId);
     if (!guild) throw new Error(`${action}: guild ${guildId} not found`);
     if (!PermissionStore.can(perm, guild)) {
-        throw new Error(`not-allowed: ${action} in guild ${guildId}: missing ${permName}. Allowed guilds: ${describeScope()}`);
+        throw new Error(`not-allowed: ${action} in guild ${guildId}: missing ${permName}. Allowed guilds: ${describeScope(currentScope())}`);
     }
 }
 
@@ -215,15 +173,15 @@ const CHANNEL_TYPE_IDS: Record<string, number> = {
 // ── Action Handlers ──────────────────────────────────────────────────────────
 
 async function handleAction(action: string, params: any): Promise<any> {
-    checkReadonly(action);
+    // One snapshot of the settings for the whole call, so every check in it agrees.
+    const scope = currentScope();
+    checkReadonly(action, scope);
     switch (action) {
 
         // ── Guilds ───────────────────────────────────────────────────────
         case "list_guilds": {
             const guilds = Object.values(GuildStore.getGuilds()) as any[];
-            const allowed = parseAllowedGuilds();
-            const filtered = allowed.length ? guilds.filter(g => allowed.includes(g.id)) : guilds;
-            return filtered.map(g => ({
+            return guilds.filter(g => guildAllowed(g.id, scope)).map(g => ({
                 id: g.id,
                 name: g.name,
                 icon: g.icon,
@@ -235,7 +193,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "get_guild_info": {
-            requireGuildScope(params.guild_id, "get_guild_info");
+            requireGuildScope(params.guild_id, "get_guild_info", scope);
             const g = GuildStore.getGuild(params.guild_id);
             if (!g) throw new Error("Guild not found");
             return {
@@ -248,7 +206,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Channels ─────────────────────────────────────────────────────
         case "list_channels": {
-            requireGuildScope(params.guild_id, "list_channels");
+            requireGuildScope(params.guild_id, "list_channels", scope);
             // Use REST API for reliable channel listing
             const res = await RestAPI.get({ url: `/guilds/${params.guild_id}/channels` });
             let channels = res.body as any[];
@@ -267,7 +225,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "get_channel_info": {
-            const c = await requireScopeForChannel(params.channel_id, "get_channel_info");
+            const c = await requireScopeForChannel(params.channel_id, "get_channel_info", scope);
             if (!c) throw new Error("Channel not found");
             return {
                 id: c.id, name: c.name,
@@ -282,7 +240,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Messages ─────────────────────────────────────────────────────
         case "send_message": {
-            const ch = await requireScopeForChannel(params.channel_id, "send_message");
+            const ch = await requireScopeForChannel(params.channel_id, "send_message", scope);
             if (ch?.type === 10 || ch?.type === 11 || ch?.type === 12) {
                 requireChannelPerm(PermissionsBits.SEND_MESSAGES_IN_THREADS, ch, "send_message", "SEND_MESSAGES_IN_THREADS");
             } else {
@@ -303,7 +261,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         // Discord lets you edit only your own messages and needs no channel permission for it,
         // so the scope check is the whole pre-flight; the API refuses other authors' messages.
         case "edit_message": {
-            await requireScopeForChannel(params.channel_id, "edit_message");
+            await requireScopeForChannel(params.channel_id, "edit_message", scope);
             await MessageActions.editMessage(params.channel_id, params.message_id, { content: params.content });
             return { success: true };
         }
@@ -311,7 +269,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         // Your own messages need no MANAGE_MESSAGES. Check it only for a cached message by
         // someone else; for an uncached one the author is unknown, so the API decides.
         case "delete_message": {
-            const ch = await requireScopeForChannel(params.channel_id, "delete_message");
+            const ch = await requireScopeForChannel(params.channel_id, "delete_message", scope);
             const target: any = MessageStore.getMessage(params.channel_id, params.message_id);
             if (target && target.author?.id !== UserStore.getCurrentUser()?.id) {
                 requireChannelPerm(PermissionsBits.MANAGE_MESSAGES, ch, "delete_message", "MANAGE_MESSAGES");
@@ -321,7 +279,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "read_messages": {
-            const ch = await requireScopeForChannel(params.channel_id, "read_messages");
+            const ch = await requireScopeForChannel(params.channel_id, "read_messages", scope);
             requireChannelPerm(PermissionsBits.VIEW_CHANNEL, ch, "read_messages", "VIEW_CHANNEL");
             requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, ch, "read_messages", "READ_MESSAGE_HISTORY");
             const query: Record<string, any> = { limit: clampLimit(params.limit, 50, 100) };
@@ -348,7 +306,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "list_threads": {
-            const parent = await requireScopeForChannel(params.channel_id, "list_threads");
+            const parent = await requireScopeForChannel(params.channel_id, "list_threads", scope);
             requireChannelPerm(PermissionsBits.VIEW_CHANNEL, parent, "list_threads", "VIEW_CHANNEL");
             if (params.archived) {
                 requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, parent, "list_threads", "READ_MESSAGE_HISTORY");
@@ -389,19 +347,15 @@ async function handleAction(action: string, params: any): Promise<any> {
             if (params.channel_id) query.channel_id = params.channel_id;
             query.include_nsfw = true;
 
-            // The channel decides the guild, through the same lookup as the other tools, so an
-            // uncached channel is not mistaken for a DM and a guild_id cannot point elsewhere.
-            let guildId: string | undefined = params.guild_id;
-            if (params.channel_id) {
-                const ch = await requireScopeForChannel(params.channel_id, "search_messages");
-                if (!ch.guild_id) throw new Error("search_messages does not search DMs");
-                if (guildId && guildId !== ch.guild_id) throw new Error(`Channel ${params.channel_id} is not in guild ${guildId}`);
-                guildId = ch.guild_id;
+            // The channel goes through the same lookup as the other tools, so an uncached
+            // channel is not mistaken for a DM; searchGuild then lets it decide the guild.
+            const ch = params.channel_id ? await requireScopeForChannel(params.channel_id, "search_messages", scope) : null;
+            const guildId = searchGuild(ch, params.channel_id, params.guild_id);
+            requireGuildScope(guildId, "search_messages", scope);
+            if (ch) {
                 requireChannelPerm(PermissionsBits.VIEW_CHANNEL, ch, "search_messages", "VIEW_CHANNEL");
                 requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, ch, "search_messages", "READ_MESSAGE_HISTORY");
             }
-            if (!guildId) throw new Error("Need guild_id or channel_id");
-            requireGuildScope(guildId, "search_messages");
 
             const res = await RestAPI.get({
                 url: `/guilds/${guildId}/messages/search`,
@@ -422,14 +376,14 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Reactions ────────────────────────────────────────────────────
         case "add_reaction": {
-            const channel = await requireScopeForChannel(params.channel_id, "add_reaction");
+            const channel = await requireScopeForChannel(params.channel_id, "add_reaction", scope);
             requireChannelPerm(PermissionsBits.ADD_REACTIONS, channel, "add_reaction", "ADD_REACTIONS");
             await ReactionActions.addReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
             return { success: true };
         }
 
         case "remove_reaction": {
-            const rmChannel = await requireScopeForChannel(params.channel_id, "remove_reaction");
+            const rmChannel = await requireScopeForChannel(params.channel_id, "remove_reaction", scope);
             requireChannelPerm(PermissionsBits.ADD_REACTIONS, rmChannel, "remove_reaction", "ADD_REACTIONS");
             await ReactionActions.removeReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
             return { success: true };
@@ -468,7 +422,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "list_guild_members": {
-            requireGuildScope(params.guild_id, "list_guild_members");
+            requireGuildScope(params.guild_id, "list_guild_members", scope);
             const limit = Math.min(params.limit || 100, 1000);
             const res = await RestAPI.get({
                 url: `/guilds/${params.guild_id}/members`,
@@ -487,9 +441,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── DMs ──────────────────────────────────────────────────────────
         case "list_dms": {
-            if (!settings.store.allowDMs) {
-                throw new Error(`not-allowed: list_dms: DMs are not allowed. Allowed guilds: ${describeScope()}`);
-            }
+            requireDMs("list_dms", scope);
             const dmIds = DMChannelStore.getPrivateChannelIds();
             return dmIds.map((id: string) => {
                 const c = ChannelStore.getChannel(id);
@@ -508,9 +460,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "send_dm": {
-            if (!settings.store.allowDMs) {
-                throw new Error(`not-allowed: send_dm to ${params.user_id}: DMs are not allowed. Allowed guilds: ${describeScope()}`);
-            }
+            requireDMs(`send_dm to ${params.user_id}`, scope);
             // Open or get DM channel, then send
             const res = await RestAPI.post({
                 url: "/users/@me/channels",
@@ -547,14 +497,14 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         // ── Voice ────────────────────────────────────────────────────────
-        // The guild comes from the channel, never from the caller, so the allowlist check
-        // applies to the server the client really joins. DM calls are out of scope.
+        // The allowlist check applies to the server the client really joins: voiceGuild takes
+        // it from the channel, never from the caller.
         case "join_voice": {
-            const vc = await requireScopeForChannel(params.channel_id, "join_voice");
-            if (vc.type !== 2 && vc.type !== 13) throw new Error(`Channel ${params.channel_id} is not a voice or stage channel`);
+            const vc = await requireScopeForChannel(params.channel_id, "join_voice", scope);
+            const guildId = voiceGuild(vc, params.channel_id);
             requireChannelPerm(PermissionsBits.CONNECT, vc, "join_voice", "CONNECT");
             await VoiceActions.selectVoiceChannel(params.channel_id, {
-                guildId: vc.guild_id,
+                guildId,
                 selfMute: params.self_mute || false,
                 selfDeaf: params.self_deaf || false
             });
@@ -568,7 +518,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Roles ────────────────────────────────────────────────────────
         case "list_roles": {
-            requireGuildScope(params.guild_id, "list_roles");
+            requireGuildScope(params.guild_id, "list_roles", scope);
             // Guild records no longer carry roles; GuildRoleStore holds them.
             if (!GuildStore.getGuild(params.guild_id)) throw new Error("Guild not found");
             const roles = Object.values(GuildRoleStore.getRolesSnapshot(params.guild_id) ?? {}) as any[];
@@ -584,7 +534,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Channel Management ───────────────────────────────────────────
         case "create_channel": {
-            requireGuildScope(params.guild_id, "create_channel");
+            requireGuildScope(params.guild_id, "create_channel", scope);
             requireGuildPerm(PermissionsBits.MANAGE_CHANNELS, params.guild_id, "create_channel", "MANAGE_CHANNELS");
             const body: any = {
                 name: params.name,
@@ -601,7 +551,7 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         case "delete_channel": {
-            const dc = await requireScopeForChannel(params.channel_id, "delete_channel");
+            const dc = await requireScopeForChannel(params.channel_id, "delete_channel", scope);
             requireChannelPerm(PermissionsBits.MANAGE_CHANNELS, dc, "delete_channel", "MANAGE_CHANNELS");
             await RestAPI.del({ url: `/channels/${params.channel_id}` });
             return { success: true };
@@ -609,7 +559,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Threads ──────────────────────────────────────────────────────
         case "create_thread": {
-            const tc = await requireScopeForChannel(params.channel_id, "create_thread");
+            const tc = await requireScopeForChannel(params.channel_id, "create_thread", scope);
             requireChannelPerm(PermissionsBits.CREATE_PUBLIC_THREADS, tc, "create_thread", "CREATE_PUBLIC_THREADS");
             const body: any = {
                 name: params.name,
@@ -630,7 +580,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Typing ───────────────────────────────────────────────────────
         case "start_typing": {
-            const stc = await requireScopeForChannel(params.channel_id, "start_typing");
+            const stc = await requireScopeForChannel(params.channel_id, "start_typing", scope);
             requireChannelPerm(PermissionsBits.SEND_MESSAGES, stc, "start_typing", "SEND_MESSAGES");
             TypingActions.startTyping(params.channel_id);
             return { success: true };
@@ -638,14 +588,14 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Pins ─────────────────────────────────────────────────────────
         case "pin_message": {
-            const pmc = await requireScopeForChannel(params.channel_id, "pin_message");
+            const pmc = await requireScopeForChannel(params.channel_id, "pin_message", scope);
             requireChannelPerm((PermissionsBits as any).PIN_MESSAGES ?? PermissionsBits.MANAGE_MESSAGES, pmc, "pin_message", "MANAGE_MESSAGES");
             await RestAPI.put({ url: `/channels/${params.channel_id}/pins/${params.message_id}` });
             return { success: true };
         }
 
         case "unpin_message": {
-            const upc = await requireScopeForChannel(params.channel_id, "unpin_message");
+            const upc = await requireScopeForChannel(params.channel_id, "unpin_message", scope);
             requireChannelPerm((PermissionsBits as any).PIN_MESSAGES ?? PermissionsBits.MANAGE_MESSAGES, upc, "unpin_message", "MANAGE_MESSAGES");
             await RestAPI.del({ url: `/channels/${params.channel_id}/pins/${params.message_id}` });
             return { success: true };
@@ -653,7 +603,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         // ── Nickname ─────────────────────────────────────────────────────
         case "set_nickname": {
-            requireGuildScope(params.guild_id, "set_nickname");
+            requireGuildScope(params.guild_id, "set_nickname", scope);
             requireGuildPerm(PermissionsBits.CHANGE_NICKNAME, params.guild_id, "set_nickname", "CHANGE_NICKNAME");
             const me = UserStore.getCurrentUser();
             await RestAPI.patch({

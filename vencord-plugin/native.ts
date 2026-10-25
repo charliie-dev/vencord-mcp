@@ -407,8 +407,9 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
     }
 ];
 
-// Hints for the client only; readonlyMode and the scope checks in index.tsx are the real gate.
-// The readOnlyHint set must equal READ_ACTIONS (plus connection_status); the smoke test checks it.
+// Hints for the client only; readonlyMode and the scope checks (scope.ts, applied by index.tsx)
+// are the real gate. The readOnlyHint set must equal READ_ACTIONS in scope.ts (plus
+// connection_status); the smoke test checks it.
 const READ = { readOnlyHint: true, openWorldHint: true };
 const ADDITIVE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
 const ADDITIVE_IDEMPOTENT = { ...ADDITIVE, idempotentHint: true };

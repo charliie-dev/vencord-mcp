@@ -15,7 +15,7 @@ run = '''
 set -euo pipefail
 dst="$VENCORD_DIR/src/userplugins/MCPBridge"
 mkdir -p "$dst"
-install -m 600 vencord-plugin/index.tsx vencord-plugin/native.ts "$dst/"
+install -m 600 vencord-plugin/index.tsx vencord-plugin/native.ts vencord-plugin/scope.ts "$dst/"
 # nub installs from Vencord's own pnpm-lock.yaml with its embedded engine and leaves the lockfile
 # untouched, so the checkout stays identical to upstream.
 nub --cwd "$VENCORD_DIR" install --frozen-lockfile

@@ -153,10 +153,8 @@ test("every tool is annotated, and readOnlyHint matches the renderer's READ_ACTI
     }
     // READ_ACTIONS is what readonlyMode lets through; a hint that disagrees with it would
     // tell the client a blocked tool is safe, or a safe tool is blocked.
-    const source = readFileSync(new URL("../vencord-plugin/index.tsx", import.meta.url), "utf8");
-    const block = source.match(/const READ_ACTIONS = new Set\(\[([\s\S]*?)\]\)/);
-    assert.ok(block, "READ_ACTIONS found in index.tsx");
-    const readActions = [...block[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1]).concat("connection_status").sort();
+    const { READ_ACTIONS } = await import("../vencord-plugin/scope.ts");
+    const readActions = [...READ_ACTIONS, "connection_status"].sort();
     const readOnly = result.tools.filter(t => t.annotations.readOnlyHint).map(t => t.name).sort();
     assert.deepEqual(readOnly, readActions);
     const destructive = result.tools.filter(t => t.annotations.destructiveHint).map(t => t.name);
