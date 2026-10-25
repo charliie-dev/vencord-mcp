@@ -524,9 +524,11 @@ async function handleAction(action: string, params: any): Promise<any> {
                 url: "/users/@me/channels",
                 body: { recipient_id: params.user_id }
             });
+            // Same REST call as send_message: MessageActions.sendMessage needs the full composer
+            // payload (invalidEmojis, validNonShortcutEmojis, …) and fails without it.
             const channelId = (res.body as any).id;
-            await MessageActions.sendMessage(channelId, { content: params.content });
-            return { success: true, channel_id: channelId };
+            const sent = await RestAPI.post({ url: `/channels/${channelId}/messages`, body: { content: params.content } });
+            return { success: true, channel_id: channelId, message_id: (sent.body as any).id };
         }
 
         // ── Status ───────────────────────────────────────────────────────
