@@ -207,11 +207,11 @@ discord-mcp/
 `native.ts` uses only Node builtins, so the whole protocol layer runs standalone — no Discord, no Electron:
 
 ```bash
-mise run test     # node --test test/native-smoke.mjs (needs Node >= 23.6 for type stripping)
-mise run deploy   # copy the plugin into $VENCORD_DIR (default ~/Work/Vencord) and rebuild it
+nub run test      # node --test test/native-smoke.mjs (needs Node >= 23.6 for type stripping)
+mise run deploy   # copy the plugin into $VENCORD_DIR (default ~/Work/Vencord) and rebuild it with nub
 ```
 
-`mise.toml` pins Node and the pnpm version Vencord's `packageManager` field expects. After `deploy`, quit Vesktop (Cmd+Q) and reopen it: `native.ts` runs in the main process, so a reload is not enough.
+The JS toolchain is [nub](https://github.com/nubjs/nub): it provisions Node from `.node-version` and runs the scripts; `mise.toml` only carries nub itself and the `deploy` task. `deploy` installs Vencord's dependencies with `nub install --frozen-lockfile`, which reads Vencord's own `pnpm-lock.yaml` and leaves it unchanged, then runs `nub run build`. After `deploy`, quit Vesktop (Cmd+Q) and reopen it: `native.ts` runs in the main process, so a reload is not enough.
 
 The smoke test boots the native module on a test port and covers `server/discover`, version negotiation, header/body validation, the tool catalog, bearer auth, method/path/host/origin guards, renderer round trip, curated permission errors, and bridge ownership.
 
