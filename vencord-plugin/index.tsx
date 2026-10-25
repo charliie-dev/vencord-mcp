@@ -59,7 +59,7 @@ function requireChannelPerm(perm: any, channel: any, action: string, permName: s
     const target = permissionTarget(channel, id => ChannelStore.getChannel(id));
     if (!target) return;
     if (!PermissionStore.can(perm, target)) {
-        throw new Error(`not-allowed: ${action} in #${channel?.name ?? channel?.id ?? "unknown"}: missing ${permName}. Allowed guilds: ${describeScope(currentScope())}`);
+        throw new Error(`not-allowed: ${action} in #${channel?.name || channel?.id || "unknown"}: missing ${permName}. Allowed guilds: ${describeScope(currentScope())}`);
     }
 }
 

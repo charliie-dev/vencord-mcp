@@ -54,7 +54,8 @@ ID from the agent cannot change the server that the plugin examines.
 `respectDiscordPerms` does not apply to all calls. Discord does not need a permission to edit your
 message or to remove your message. Thus the plugin does not examine permissions for `edit_message`.
 For `delete_message`, the plugin examines `MANAGE_MESSAGES` only for a message from a different
-person in the client cache. For other messages, the Discord API does the check.
+person in the client cache. For other messages, the Discord API does the check. In a DM, the plugin
+does not examine permissions: `allowDMs` controls DMs.
 
 If a setting stops a call, the result starts with `You are not allowed to do`. The result also
 gives the tool, the channel or server, and the cause.

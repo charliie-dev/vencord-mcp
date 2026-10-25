@@ -83,6 +83,13 @@ test("permissionTarget prefers the cached record, falls back to a thread's paren
     assert.equal(permissionTarget(null, getChannel), null);
 });
 
+test("permissionTarget skips DMs, even cached ones, so the pre-flight cannot refuse them", () => {
+    const records = { d: { id: "d", type: 1 }, g: { id: "g", type: 3 } };
+    const getChannel = id => records[id];
+    assert.equal(permissionTarget({ id: "d", type: 1 }, getChannel), null);
+    assert.equal(permissionTarget({ id: "g", type: 3 }, getChannel), null);
+});
+
 test("searchGuild lets a given channel decide the guild", () => {
     const channel = { id: "c", type: 0, guild_id: "1" };
     assert.equal(searchGuild(channel, "c", undefined), "1");

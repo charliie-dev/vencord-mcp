@@ -66,8 +66,10 @@ export function requireChannelScope(channel: any, channelId: string, action: str
 
 // PermissionStore.can() needs a ChannelRecord. A thread fetched over REST is a plain object,
 // so check its parent instead; with no record at all, leave the decision to the API (null).
+// DMs have no permission overwrites and can() answers false for them, which refused every DM
+// read; allowDMs is their gate, and the API decides the rest.
 export function permissionTarget(channel: any, getChannel: (id: string) => any): any {
-    if (!channel) return null;
+    if (!channel || DM_TYPES.has(channel.type)) return null;
     const cached = getChannel(channel.id);
     if (cached) return cached;
     if (THREAD_TYPES.has(channel.type) && channel.parent_id) return getChannel(channel.parent_id) ?? null;
