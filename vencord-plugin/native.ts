@@ -28,16 +28,30 @@ const INSTRUCTIONS = "Controls the local Discord client through its Vencord plug
 
 export type ToolCall = { id: number; action: string; params: Record<string, any> };
 
+// An empty token file would make every request fail with 401, so it gets a new token too.
+// Any other failure returns "" and the endpoint stays closed: a throw here would abort the
+// whole native module, and the renderer would only report a missing native build.
 function readToken(): string {
     try {
-        return readFileSync(TOKEN_PATH, "utf8").trim();
-    } catch {
+        const existing = readFileSync(TOKEN_PATH, "utf8").trim();
+        if (existing) return existing;
+        console.warn(`[mcp] token file ${TOKEN_PATH} is empty — generating a new token`);
+    } catch (e: any) {
+        if (e?.code !== "ENOENT") {
+            console.error(`[mcp] cannot read token file ${TOKEN_PATH}: ${e?.message ?? e}`);
+            return "";
+        }
+    }
+    try {
         const token = randomBytes(32).toString("hex");
         mkdirSync(dirname(TOKEN_PATH), { recursive: true });
         writeFileSync(TOKEN_PATH, token + "\n", { mode: 0o600 });
         try { chmodSync(TOKEN_PATH, 0o600); } catch { }
         console.log(`[mcp] generated shared token at ${TOKEN_PATH}`);
         return token;
+    } catch (e: any) {
+        console.error(`[mcp] cannot write token file ${TOKEN_PATH}: ${e?.message ?? e}`);
+        return "";
     }
 }
 
@@ -796,4 +810,5 @@ function startBridge(): void {
     server.unref();
 }
 
-startBridge();
+if (token) startBridge();
+else console.error("[mcp] no usable token — the MCP endpoint is not started. Fix the token file and restart Vesktop.");

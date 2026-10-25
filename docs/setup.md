@@ -85,7 +85,7 @@ For the effect of each setting on the tools, refer to [mcp.md](mcp.md#access-lim
 | ------------------------ | ----------------------------- | -------------------------------------------------------------- |
 | `VENCORD_DIR`            | `~/Work/Vencord`              | The Vencord source directory. `mise run deploy` uses it        |
 | `DISCORD_MCP_PORT`       | `7890`                        | The port of the MCP endpoint                                   |
-| `DISCORD_MCP_TOKEN_FILE` | `~/.config/discord-mcp/token` | The token file. If there is no token file, the plugin makes it |
+| `DISCORD_MCP_TOKEN_FILE` | `~/.config/discord-mcp/token` | The token file. If it is missing or empty, the plugin makes it |
 
 `native.ts` reads `DISCORD_MCP_PORT` and `DISCORD_MCP_TOKEN_FILE` from the environment of the
 Vesktop process. If you start Vesktop from the Dock, the variables of your shell do not apply.
@@ -140,6 +140,10 @@ curl -s http://127.0.0.1:7890/mcp \
 ```
 
 The result must contain `"supportedVersions":["2026-07-28"]`.
+
+**The Vesktop console shows `no usable token`.**
+The plugin cannot read or write the token file. Thus the endpoint does not start. Make sure that
+the token file is a file and that you can read it. Then stop Vesktop fully and start it again.
 
 **The endpoint sends 401.**
 The token file changed. If you remove the token file, the plugin makes a new token at the next

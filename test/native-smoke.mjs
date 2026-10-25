@@ -6,7 +6,8 @@
  * Requires Node >= 23.6 (type stripping); run with: npm test
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -428,6 +429,34 @@ test("an error without a usable request id carries id null", async () => {
     const noMethod = await fetch(BASE, { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 7 }) });
     assert.equal(noMethod.status, 400);
     assert.equal((await noMethod.json()).id, 7);
+});
+
+test("an empty token file gets a new token", () => {
+    const emptyFile = join(dir, "empty-token");
+    writeFileSync(emptyFile, "\n", { mode: 0o600 });
+    const nativeUrl = new URL("../vencord-plugin/native.ts", import.meta.url).href;
+    // Port 0: the child must not wait for a port that another test run holds.
+    execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(nativeUrl)})`], {
+        env: { ...process.env, DISCORD_MCP_PORT: "0", DISCORD_MCP_TOKEN_FILE: emptyFile },
+        stdio: "pipe",
+        timeout: 10_000
+    });
+    assert.match(readFileSync(emptyFile, "utf8"), /^[0-9a-f]{64}\n$/);
+});
+
+test("an unreadable token file keeps the endpoint closed instead of aborting the module", () => {
+    const notAFile = join(dir, "token-dir");
+    mkdirSync(notAFile);
+    const nativeUrl = new URL("../vencord-plugin/native.ts", import.meta.url).href;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(nativeUrl)}); console.log("module loaded")`], {
+        env: { ...process.env, DISCORD_MCP_PORT: "0", DISCORD_MCP_TOKEN_FILE: notAFile },
+        encoding: "utf8",
+        timeout: 10_000
+    });
+    assert.equal(child.status, 0, child.stderr);
+    assert.match(child.stdout, /module loaded/);
+    assert.match(child.stderr, /cannot read token file/);
+    assert.match(child.stderr, /endpoint is not started/);
 });
 
 after(() => {
