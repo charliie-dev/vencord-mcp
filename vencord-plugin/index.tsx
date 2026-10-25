@@ -18,7 +18,6 @@ const TypingActions = findByPropsLazy("startTyping");
 const VoiceActions = findByPropsLazy("selectVoiceChannel");
 const PresenceStore = findStoreLazy("PresenceStore");
 const DMChannelStore = findByPropsLazy("getPrivateChannelIds");
-const ReactionActions = findByPropsLazy("addReaction", "removeReaction");
 
 // ── Plugin Settings (Scope-restriction + Readonly + Discord-capability) ───────
 
@@ -89,11 +88,12 @@ function formatThread(c: any, joined?: boolean) {
     };
 }
 
-// Accepts a unicode emoji, name:id, a:name:id (animated) and the <a:name:id> chat form.
-function parseEmoji(text: string) {
+// The {emoji} segment of the reaction routes: a unicode emoji as is, a custom one as name:id.
+// Accepts name:id, a:name:id (animated) and the <a:name:id> chat form.
+function emojiRoute(text: string): string {
     const parts = text.replace(/^<|>$/g, "").split(":");
-    if (parts.length < 2) return { id: null, name: text, animated: false };
-    return { id: parts[parts.length - 1], name: parts[parts.length - 2], animated: parts.length === 3 && parts[0] === "a" };
+    const emoji = parts.length < 2 ? text : `${parts[parts.length - 2]}:${parts[parts.length - 1]}`;
+    return encodeURIComponent(emoji);
 }
 
 function requireGuildPerm(perm: any, guildId: string, action: string, permName: string) {
@@ -375,17 +375,19 @@ async function handleAction(action: string, params: any): Promise<any> {
         }
 
         // ── Reactions ────────────────────────────────────────────────────
+        // REST, like send_message: no webpack module exports addReaction/removeReaction any
+        // more, so the lazy lookup failed with "Reflect.get called on non-object".
         case "add_reaction": {
             const channel = await requireScopeForChannel(params.channel_id, "add_reaction", scope);
             requireChannelPerm(PermissionsBits.ADD_REACTIONS, channel, "add_reaction", "ADD_REACTIONS");
-            await ReactionActions.addReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
+            await RestAPI.put({ url: `/channels/${params.channel_id}/messages/${params.message_id}/reactions/${emojiRoute(params.emoji)}/@me` });
             return { success: true };
         }
 
+        // Removing your own reaction needs no channel permission, so only the scope is checked.
         case "remove_reaction": {
-            const rmChannel = await requireScopeForChannel(params.channel_id, "remove_reaction", scope);
-            requireChannelPerm(PermissionsBits.ADD_REACTIONS, rmChannel, "remove_reaction", "ADD_REACTIONS");
-            await ReactionActions.removeReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
+            await requireScopeForChannel(params.channel_id, "remove_reaction", scope);
+            await RestAPI.del({ url: `/channels/${params.channel_id}/messages/${params.message_id}/reactions/${emojiRoute(params.emoji)}/@me` });
             return { success: true };
         }
 
