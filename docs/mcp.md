@@ -78,7 +78,7 @@ settings control which tools operate.
 | `list_dms`           | read-only   | Shows your DM channels                                                        |
 | `get_current_user`   | read-only   | Shows the data of your account. It does not show your email address           |
 | `get_user_info`      | read-only   | Shows the data of one user                                                    |
-| `list_guild_members` | read-only   | Shows the members of a server                                                 |
+| `list_guild_members` | read-only   | Shows the members of a server that are in the client cache                    |
 | `list_roles`         | read-only   | Shows the roles of a server                                                   |
 | `connection_status`  | read-only   | Shows if the Discord page has a connection to the endpoint                    |
 | `send_message`       | additive    | Sends a message to a channel or a thread. The message can reply to a message  |
@@ -97,6 +97,11 @@ settings control which tools operate.
 | `set_status`         | destructive | Sets your status and your custom status                                       |
 | `set_nickname`       | destructive | Sets your nickname in a server                                                |
 | `leave_voice`        | destructive | Disconnects from the voice channel                                            |
+
+Discord gives the full member list of a server only to bots. Thus `list_guild_members` shows only
+the members in the client cache, sorted by user ID. To get more members, open the member list of
+the server in Discord. The result has `total_cached` and `has_more`. Use `limit` (default 100,
+maximum 1000) and `offset` for the next page.
 
 No tool accepts a local file path. The plugin does not use the Discord endpoint that marks a channel
 as read.

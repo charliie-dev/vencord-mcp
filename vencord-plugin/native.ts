@@ -239,12 +239,13 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
     },
     {
         name: "list_guild_members",
-        description: "List members of a guild (fetches from member list)",
+        description: "List the members of a guild that the Discord client has loaded, sorted by user ID. A user account cannot fetch the full list of a large guild; open its member list in Discord to load more.",
         inputSchema: {
             type: "object",
             properties: {
                 guild_id: { type: "string", description: "The guild ID" },
-                limit: { type: "number", description: "Max members to return (default 100)" }
+                limit: { type: "number", description: "Max members to return (default 100, max 1000)" },
+                offset: { type: "number", description: "Skip this many members" }
             },
             required: ["guild_id"],
             additionalProperties: false

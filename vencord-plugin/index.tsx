@@ -7,7 +7,7 @@
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, MessageStore, PermissionStore, PermissionsBits } from "@webpack/common";
+import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildMemberStore, GuildRoleStore, GuildStore, MessageStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
 import { checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permissionTarget, requireChannelScope, requireDMs, requireGuildScope, requireIds, type Scope, searchGuild, THREAD_TYPES, voiceGuild } from "./scope";
 
@@ -428,20 +428,32 @@ async function handleAction(action: string, params: any): Promise<any> {
 
         case "list_guild_members": {
             requireGuildScope(params.guild_id, "list_guild_members", scope);
-            const limit = Math.min(params.limit || 100, 1000);
-            const res = await RestAPI.get({
-                url: `/guilds/${params.guild_id}/members`,
-                query: { limit }
-            });
-            return (res.body as any[]).map((m: any) => ({
-                user_id: m.user.id,
-                username: m.user.username,
-                display_name: m.user.global_name,
-                nickname: m.nick,
-                roles: m.roles,
-                joined_at: m.joined_at,
-                avatar: m.avatar
-            }));
+            // GET /guilds/{id}/members is for bots: a user account gets HTTP 403 (code 50001). The
+            // client loads members over the gateway, mostly for the member list you have seen, so
+            // this lists those. Sorted by user ID for stable pages. An unknown guild must not read
+            // as an empty cache.
+            if (!GuildStore.getGuild(params.guild_id)) throw new Error("Guild not found");
+            const members = [...(GuildMemberStore.getMembers(params.guild_id) ?? [])]
+                .sort((a, b) => { const x = BigInt(a.userId), y = BigInt(b.userId); return x === y ? 0 : x < y ? -1 : 1; });
+            const limit = clampLimit(params.limit, 100, 1000);
+            const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
+            return {
+                total_cached: members.length,
+                has_more: offset + limit < members.length,
+                members: members.slice(offset, offset + limit).map(m => {
+                    const u = UserStore.getUser(m.userId);
+                    return {
+                        user_id: m.userId,
+                        username: u?.username,
+                        display_name: u?.globalName,
+                        nickname: m.nick,
+                        roles: m.roles,
+                        joined_at: m.joinedAt,
+                        avatar: m.avatar
+                    };
+                }),
+                note: "Only members the client has loaded (mostly from the member list you have opened). A user account cannot get the full list of a large server."
+            };
         }
 
         // ── DMs ──────────────────────────────────────────────────────────
