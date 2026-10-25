@@ -23,7 +23,7 @@ const ReactionActions = findByPropsLazy("addReaction", "removeReaction");
 const settings = definePluginSettings({
     allowedGuildIds: { type: OptionType.STRING, description: "Comma-separated guild IDs (empty = all)", default: "" },
     allowDMs: { type: OptionType.BOOLEAN, description: "Allow DM tools", default: false },
-    readonlyMode: { type: OptionType.BOOLEAN, description: "Block all mutating actions", default: false },
+    readonlyMode: { type: OptionType.BOOLEAN, description: "Block all mutating actions", default: true },
     respectDiscordPerms: { type: OptionType.BOOLEAN, description: "Pre-flight with PermissionStore.can()", default: true },
 });
 
@@ -373,7 +373,7 @@ async function handleAction(action: string, params: any): Promise<any> {
             return {
                 id: u.id, username: u.username,
                 display_name: u.globalName, discriminator: u.discriminator,
-                avatar: u.avatar, email: u.email,
+                avatar: u.avatar,
                 premium_type: u.premiumType, status: PresenceStore?.getStatus(u.id)
             };
         }
