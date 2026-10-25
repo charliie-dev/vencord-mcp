@@ -126,6 +126,18 @@ let pollGeneration = 0;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// RestAPI rejects with the HTTP response object, not an Error, so String(e) gave "[object Object]".
+function describeError(e: any): string {
+    if (e instanceof Error) return e.message;
+    const body = e?.body;
+    if (body?.message) {
+        const code = body.code !== undefined ? ` (code ${body.code})` : "";
+        return `${e.status ? `HTTP ${e.status}: ` : ""}${body.message}${code}`;
+    }
+    if (e?.status) return `HTTP ${e.status}`;
+    try { return JSON.stringify(e); } catch { return String(e); }
+}
+
 function nativeAvailable(): boolean {
     return Boolean(VencordNative?.pluginHelpers?.MCPBridge?.poll);
 }
@@ -148,7 +160,7 @@ async function pollLoop() {
             await Native.complete(call.id, result);
         } catch (e: any) {
             try {
-                await Native.complete(call.id, null, e?.message || String(e));
+                await Native.complete(call.id, null, describeError(e));
             } catch (reportError: any) {
                 console.error("[MCPBridge] Failed to report error:", reportError?.message ?? reportError);
             }
