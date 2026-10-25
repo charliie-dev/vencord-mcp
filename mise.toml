@@ -1,0 +1,27 @@
+[tools]
+# The smoke test imports native.ts directly, which needs Node's type stripping (>= 23.6).
+node = "26.12.1"
+# Only used to build the Vencord checkout; matches its packageManager field.
+pnpm = "11.9.0"
+
+[env]
+# Vencord source checkout that Vesktop loads (Vesktop settings -> Vencord Location = <this>/dist).
+VENCORD_DIR = "{{ get_env(name='VENCORD_DIR', default=env.HOME ~ '/Work/Vencord') }}"
+
+[tasks.test]
+description = "Protocol smoke test for native.ts; needs no Discord"
+run = "node --test test/native-smoke.mjs"
+
+[tasks.deploy]
+description = "Copy the plugin into $VENCORD_DIR/src/userplugins/MCPBridge and rebuild Vencord"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+dst="$VENCORD_DIR/src/userplugins/MCPBridge"
+mkdir -p "$dst"
+install -m 600 vencord-plugin/index.tsx vencord-plugin/native.ts "$dst/"
+pnpm --dir "$VENCORD_DIR" install --frozen-lockfile
+pnpm --dir "$VENCORD_DIR" build
+# native.ts runs in Vesktop's main process, so a renderer reload (Cmd+R) does not pick it up.
+echo "built $VENCORD_DIR/dist; quit Vesktop (Cmd+Q) and reopen to load the new build"
+'''
