@@ -241,6 +241,35 @@ test("tool call round trip through the renderer bridge", async () => {
     assert.equal(status.result.isError, undefined);
 });
 
+test("a call arriving while the renderer is busy after an idle period is queued, not refused", { timeout: 5000 }, async t => {
+    // Observed live: after >15 s idle, two parallel tool calls -> the first reached the renderer,
+    // the second failed with "not connected" because the renderer was no longer waiting and its
+    // last poll was stale.
+    t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    const polled = native.poll(fakeEvent(1));
+    t.mock.timers.tick(20_000);
+
+    const first = rpc("tools/call", { name: "list_guilds", arguments: {} });
+    const call1 = await polled;
+    const second = rpc("tools/call", { name: "list_roles", arguments: { guild_id: "1" } });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    native.complete(fakeEvent(1), call1.id, []);
+    // A queued call comes back synchronously; a Promise means the queue was empty, i.e. the
+    // second call was refused instead of queued.
+    const call2 = native.poll(fakeEvent(1));
+    if (call2 instanceof Promise) native.detach(fakeEvent(1));
+    assert.ok(!(call2 instanceof Promise), "second call was queued for the renderer");
+    assert.equal(call2.action, "list_roles");
+    native.complete(fakeEvent(1), call2.id, []);
+
+    for (const res of [await first, await second]) {
+        const { result } = await res.json();
+        assert.equal(result.isError, undefined, result.content?.[0]?.text);
+    }
+    native.detach(fakeEvent(1));
+});
+
 test("permission errors are curated", async () => {
     const polled = native.poll(fakeEvent(1));
     const resPromise = rpc("tools/call", { name: "send_message", arguments: { channel_id: "42", content: "hi" } });

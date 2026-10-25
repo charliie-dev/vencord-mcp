@@ -444,6 +444,10 @@ function dispatchCall(action: string, params: Record<string, any>): Promise<unkn
         if (waiter) {
             const w = waiter;
             waiter = null;
+            // Handing over a call proves the renderer is alive now. Without this, a renderer
+            // that had been waiting longer than WAITER_FRESH_MS looked dead the moment it took
+            // the call, so a second call arriving while it worked was refused, not queued.
+            ownerLastSeen = Date.now();
             w.resolve({ id, action, params });
         } else {
             queue.push({ id, action, params });
