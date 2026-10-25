@@ -157,7 +157,7 @@ result of `server/discover` and of `tools/list` for 10 minutes (`ttlMs` 600000).
 | 400         | `-32600`      | The body is not a JSON-RPC request                                      |
 | 404         | `-32601`      | The method is unknown. `ping` is an unknown method                      |
 | 404         | `-32600`      | The path is not `/mcp`                                                  |
-| 200         | `-32602`      | The tool is unknown                                                     |
+| 200         | `-32602`      | The tool is unknown, or `arguments` is not an object                    |
 | 401         | `-32001`      | The bearer token is missing or not correct                              |
 | 403         | `-32600`      | The request has an `Origin` header, or the `Host` header is not correct |
 | 405         | `-32600`      | The HTTP method is not POST                                             |
@@ -166,6 +166,11 @@ result of `server/discover` and of `tools/list` for 10 minutes (`ttlMs` 600000).
 
 The `-32022` error has `data.supported` (the versions of the endpoint) and `data.requested`. If
 the endpoint cannot find the request ID, the error has `id: null`.
+
+The endpoint examines the tool arguments with the input schema of the tool. A necessary argument
+must be present, each argument must have the correct type, and other arguments are not permitted.
+An optional argument with the value `null` is the same as no argument. If an argument is not
+correct, the result has `isError: true`, and the Discord page does not get the call.
 
 If the body has more than 4,000,000 bytes, the endpoint does not send 413. It closes the
 connection.

@@ -43,7 +43,15 @@ function readToken(): string {
 
 const token = readToken();
 
-const TOOLS = [
+// Every schema is flat: string, number and boolean properties, some required, no extras.
+type InputSchema = {
+    type: "object";
+    properties: Record<string, { type: "string" | "number" | "boolean"; description: string; }>;
+    required?: string[];
+    additionalProperties: false;
+};
+
+const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] = [
     {
         name: "list_guilds",
         description: "List all Discord servers (guilds) the user is in",
@@ -409,6 +417,27 @@ const ANNOTATIONS: Record<string, object> = {
 const TOOL_LIST = TOOLS.map(t => ({ ...t, annotations: ANNOTATIONS[t.name] }));
 const TOOL_NAMES = new Set(TOOLS.map(t => t.name));
 
+const TOOL_SCHEMAS = new Map(TOOLS.map(t => [t.name, t.inputSchema] as const));
+
+// Checking the flat schema shape exactly keeps the renderer from acting on a missing or
+// mistyped ID. A null optional argument means "not given", as many JSON clients send it.
+function argumentError(schema: InputSchema, args: Record<string, unknown>): string | null {
+    for (const key of schema.required ?? []) {
+        if (args[key] === undefined || args[key] === null) return `'${key}' is required`;
+    }
+    for (const [key, value] of Object.entries(args)) {
+        const property = schema.properties[key];
+        if (!property) return `unknown argument '${key}'`;
+        if (value !== null && typeof value !== property.type) return `'${key}' must be a ${property.type}`;
+    }
+    return null;
+}
+
+// The renderer then sees a null argument as absent; set_status would otherwise clear the
+// custom status for text: null.
+const withoutNulls = (args: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(args).filter(([, value]) => value !== null));
+
 // ── Renderer bridge ──────────────────────────────────────────────────────────
 
 const queue: ToolCall[] = [];
@@ -605,17 +634,23 @@ async function handleRpc(method: string, params: any): Promise<object> {
             return asResult({ tools: TOOL_LIST, ttlMs: LIST_TTL_MS, cacheScope: "public" });
         case "tools/call": {
             const name: string = params?.name;
-            const args: Record<string, any> = params?.arguments ?? {};
+            const args = params?.arguments ?? {};
+            // Sent with 200, not 400: a client that also speaks legacy revisions treats a 400
+            // without a modern error code (-32020..-32022) as "legacy server" and falls back.
+            if (!TOOL_NAMES.has(name)) throw new RpcFailure(200, -32602, `Unknown tool: ${name}`);
+            if (typeof args !== "object" || args === null || Array.isArray(args)) {
+                throw new RpcFailure(200, -32602, "Invalid params: arguments must be an object");
+            }
+            // A schema violation is a tool execution error, so the model can read it and retry.
+            const invalid = argumentError(TOOL_SCHEMAS.get(name)!, args);
+            if (invalid) return asResult(err(`Invalid arguments for ${name}: ${invalid}`));
             if (name === "connection_status") {
                 return asResult(bridgeAlive()
                     ? ok("Vencord bridge plugin is connected and ready.")
                     : err("Vencord bridge plugin is NOT connected. Make sure Discord is open with the MCPBridge plugin enabled."));
             }
-            // Sent with 200, not 400: a client that also speaks legacy revisions treats a 400
-            // without a modern error code (-32020..-32022) as "legacy server" and falls back.
-            if (!TOOL_NAMES.has(name)) throw new RpcFailure(200, -32602, `Unknown tool: ${name}`);
             try {
-                return asResult(ok(await dispatchCall(name, args)));
+                return asResult(ok(await dispatchCall(name, withoutNulls(args))));
             } catch (e: any) {
                 return asResult(err(e?.message ?? String(e)));
             }

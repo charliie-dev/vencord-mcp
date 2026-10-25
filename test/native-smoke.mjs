@@ -350,6 +350,22 @@ test("a call that times out in the queue never reaches the renderer", { timeout:
     assert.equal(await next, null);
 });
 
+test("tool arguments are checked against the input schema before the renderer sees them", async () => {
+    const cases = [
+        [{ name: "get_guild_info", arguments: {} }, /'guild_id' is required/],
+        [{ name: "get_guild_info", arguments: { guild_id: 1 } }, /'guild_id' must be a string/],
+        [{ name: "list_guilds", arguments: { extra: "x" } }, /unknown argument 'extra'/],
+    ];
+    for (const [params, why] of cases) {
+        const { result } = await (await rpc("tools/call", params)).json();
+        assert.equal(result.isError, true);
+        assert.match(result.content[0].text, why);
+    }
+    const notObject = await rpc("tools/call", { name: "list_guilds", arguments: ["x"] });
+    assert.equal(notObject.status, 200);
+    assert.equal((await notObject.json()).error.code, -32602);
+});
+
 // Writes the body in 64 KiB chunks with no Content-Length, so the server must count bytes.
 function chunkedPost(totalBytes) {
     return new Promise((resolve, reject) => {
@@ -388,6 +404,20 @@ test("an oversized body gets a 413 response, not a reset connection", async () =
 
 test("a chunked body far over the limit has its connection cut", async () => {
     await assert.rejects(chunkedPost(4_000_001 + 65_536 * 4));
+});
+
+test("a null optional argument counts as not given; a null required one is missing", async () => {
+    const { result } = await (await rpc("tools/call", { name: "get_guild_info", arguments: { guild_id: null } })).json();
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /'guild_id' is required/);
+
+    const polled = native.poll(fakeEvent(1));
+    const res = rpc("tools/call", { name: "read_messages", arguments: { channel_id: "1", before: null } });
+    const call = await polled;
+    assert.deepEqual(call.params, { channel_id: "1" }, "the renderer does not see the null argument");
+    native.complete(fakeEvent(1), call.id, []);
+    assert.equal((await (await res).json()).result.isError, undefined);
+    native.detach(fakeEvent(1));
 });
 
 test("an error without a usable request id carries id null", async () => {

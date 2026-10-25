@@ -43,6 +43,8 @@ The repo does not contain the token. The plugin makes the token at the first sta
 - If a channel is not in the client cache, the plugin gets the channel from the Discord API to
   find its server. If the plugin cannot find the server, the call stops with an error.
 - If `respectDiscordPerms` is on, the plugin examines your Discord permissions before each call.
+- The endpoint examines the tool arguments with the input schema of the tool. The Discord page
+  gets only calls with correct arguments.
 - No tool accepts a local file path. An agent cannot send a file from your computer.
 - The plugin does not use the Discord endpoint that marks a channel as read.
 
