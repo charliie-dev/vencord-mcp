@@ -7,7 +7,7 @@
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, PermissionStore, PermissionsBits } from "@webpack/common";
+import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, MessageStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
@@ -293,16 +293,22 @@ async function handleAction(action: string, params: any): Promise<any> {
             return { success: true, channel_id: params.channel_id, message_id: (res.body as any).id };
         }
 
+        // Discord lets you edit only your own messages and needs no channel permission for it,
+        // so the scope check is the whole pre-flight; the API refuses other authors' messages.
         case "edit_message": {
-            const ch = await requireScopeForChannel(params.channel_id, "edit_message");
-            requireChannelPerm(PermissionsBits.SEND_MESSAGES, ch, "edit_message", "SEND_MESSAGES");
+            await requireScopeForChannel(params.channel_id, "edit_message");
             await MessageActions.editMessage(params.channel_id, params.message_id, { content: params.content });
             return { success: true };
         }
 
+        // Your own messages need no MANAGE_MESSAGES. Check it only for a cached message by
+        // someone else; for an uncached one the author is unknown, so the API decides.
         case "delete_message": {
             const ch = await requireScopeForChannel(params.channel_id, "delete_message");
-            requireChannelPerm(PermissionsBits.MANAGE_MESSAGES, ch, "delete_message", "MANAGE_MESSAGES");
+            const target: any = MessageStore.getMessage(params.channel_id, params.message_id);
+            if (target && target.author?.id !== UserStore.getCurrentUser()?.id) {
+                requireChannelPerm(PermissionsBits.MANAGE_MESSAGES, ch, "delete_message", "MANAGE_MESSAGES");
+            }
             await MessageActions.deleteMessage(params.channel_id, params.message_id);
             return { success: true };
         }

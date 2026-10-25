@@ -51,6 +51,11 @@ server, and the channel is not a DM, the call stops with an error.
 The plugin finds the server from the channel ID. For `join_voice` and `search_messages`, a server
 ID from the agent cannot change the server that the plugin examines.
 
+`respectDiscordPerms` does not apply to all calls. Discord does not need a permission to edit your
+message or to remove your message. Thus the plugin does not examine permissions for `edit_message`.
+For `delete_message`, the plugin examines `MANAGE_MESSAGES` only for a message from a different
+person in the client cache. For other messages, the Discord API does the check.
+
 If a setting stops a call, the result starts with `You are not allowed to do`. The result also
 gives the tool, the channel or server, and the cause.
 
