@@ -9,11 +9,21 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-const PORT = 7912;
+// A fixed port that something else holds would put native.ts in passive mode, and every
+// request would then go to the other server.
+const PORT = await new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+        const { port } = probe.address();
+        probe.close(() => resolve(port));
+    });
+});
 const TOKEN = "smoke-test-token";
 const VERSION = "2026-07-28";
 
@@ -457,6 +467,23 @@ test("an unreadable token file keeps the endpoint closed instead of aborting the
     assert.match(child.stdout, /module loaded/);
     assert.match(child.stderr, /cannot read token file/);
     assert.match(child.stderr, /endpoint is not started/);
+});
+
+test("a stale owner loses the bridge, and only the owner can complete a call", { timeout: 5000 }, async t => {
+    t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    const polled = native.poll(fakeEvent(1));
+    const res = rpc("tools/call", { name: "list_guilds", arguments: {} });
+    const call = await polled;
+    // Renderer 1 took the call and then went silent: no waiter and no poll for 20 s.
+    t.mock.timers.tick(20_000);
+
+    const takeover = native.poll(fakeEvent(2));
+    assert.ok(takeover instanceof Promise, "renderer 2 now holds the bridge and waits");
+    assert.throws(() => native.complete(fakeEvent(1), call.id, []), /not the bridge owner/);
+    native.complete(fakeEvent(2), call.id, []);
+    assert.equal((await (await res).json()).result.isError, undefined);
+    native.detach(fakeEvent(2));
+    assert.equal(await takeover, null);
 });
 
 after(() => {
