@@ -7,7 +7,7 @@
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildStore, PermissionStore, PermissionsBits } from "@webpack/common";
+import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
@@ -221,7 +221,8 @@ async function handleAction(action: string, params: any): Promise<any> {
                 name: g.name,
                 icon: g.icon,
                 owner_id: g.ownerId,
-                member_count: g.memberCount,
+                // Guild records carry no member count; GuildMemberCountStore holds it.
+                member_count: GuildMemberCountStore.getMemberCount(g.id),
                 description: g.description
             }));
         }
@@ -232,7 +233,7 @@ async function handleAction(action: string, params: any): Promise<any> {
             if (!g) throw new Error("Guild not found");
             return {
                 id: g.id, name: g.name, icon: g.icon,
-                owner_id: g.ownerId, member_count: g.memberCount,
+                owner_id: g.ownerId, member_count: GuildMemberCountStore.getMemberCount(g.id),
                 description: g.description, vanity_url: g.vanityURLCode,
                 premium_tier: g.premiumTier, premium_sub_count: g.premiumSubscriberCount
             };
@@ -568,9 +569,9 @@ async function handleAction(action: string, params: any): Promise<any> {
         // ── Roles ────────────────────────────────────────────────────────
         case "list_roles": {
             requireGuildScope(params.guild_id, "list_roles");
-            const guild = GuildStore.getGuild(params.guild_id);
-            if (!guild) throw new Error("Guild not found");
-            const roles = Object.values(guild.roles) as any[];
+            // Guild records no longer carry roles; GuildRoleStore holds them.
+            if (!GuildStore.getGuild(params.guild_id)) throw new Error("Guild not found");
+            const roles = Object.values(GuildRoleStore.getRolesSnapshot(params.guild_id) ?? {}) as any[];
             return roles
                 .sort((a, b) => b.position - a.position)
                 .map(r => ({
