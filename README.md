@@ -104,7 +104,7 @@ The first start generates a shared bearer token at `~/.config/discord-mcp/token`
 
 ### 4. Configure your MCP client
 
-The endpoint is plain Streamable HTTP at `http://127.0.0.1:7890/mcp` and requires the token as a bearer header. Any MCP client with HTTP transport support works.
+The endpoint is Streamable HTTP at `http://127.0.0.1:7890/mcp` and requires the token as a bearer header. It speaks MCP revision **2026-07-28 only** (stateless: no `initialize` handshake, no sessions), so the client must support that revision; legacy clients get an `UnsupportedProtocolVersionError` naming it.
 
 #### Claude Code
 
@@ -169,7 +169,7 @@ MCP Client  <──────────────────────�
                main process)                                                 Discord APIs)
 ```
 
-1. **native.ts** — Vencord native module in Discord's main process. Owns the HTTP MCP endpoint on `127.0.0.1:7890/mcp`, validates the bearer token, and implements the MCP handshake and tool surface.
+1. **native.ts** — Vencord native module in Discord's main process. Owns the HTTP MCP endpoint on `127.0.0.1:7890/mcp`, validates the bearer token and the per-request protocol metadata, and implements `server/discover` and the tool surface.
 2. **index.tsx** — Vencord plugin in Discord's renderer. Long-polls the native module over Vencord's plugin IPC, executes each tool call against Discord's internal webpack modules, and completes the request.
 3. When an AI agent calls a tool (e.g. `send_message`), the native module queues the call, the renderer picks it up, calls the Discord API, and returns the result.
 
@@ -210,7 +210,7 @@ discord-mcp/
 npm test          # node --test test/native-smoke.mjs (needs Node >= 23.6 for type stripping)
 ```
 
-The smoke test boots the native module on a test port and covers the handshake, tool catalog, bearer auth, host/path guards, renderer round trip, curated permission errors, and bridge ownership.
+The smoke test boots the native module on a test port and covers `server/discover`, version negotiation, header/body validation, the tool catalog, bearer auth, method/path/host/origin guards, renderer round trip, curated permission errors, and bridge ownership.
 
 ## Troubleshooting
 
@@ -218,7 +218,15 @@ The smoke test boots the native module on a test port and covers the handshake, 
 
 - Discord must be running with the **MCPBridge** plugin enabled — the endpoint is inside Discord.
 - Check Discord console (Ctrl+Shift+I) for `[mcp]` logs.
-- Verify from a shell: `curl -H "Authorization: Bearer $(cat ~/.config/discord-mcp/token)" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' http://127.0.0.1:7890/mcp`
+- Verify from a shell:
+
+  ```bash
+  curl -s http://127.0.0.1:7890/mcp \
+    -H "Authorization: Bearer $(cat ~/.config/discord-mcp/token)" \
+    -H "Content-Type: application/json" \
+    -H "MCP-Protocol-Version: 2026-07-28" -H "Mcp-Method: server/discover" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+  ```
 
 ### 401 invalid or missing bearer token
 

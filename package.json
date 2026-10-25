@@ -1,6 +1,6 @@
 {
   "name": "discord-mcp",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "MCP endpoint for Discord, hosted inside the Vencord bridge plugin",
   "type": "module",
   "private": true,
