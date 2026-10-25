@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 import {
     checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permissionTarget, READ_ACTIONS,
-    requireChannelScope, requireDMs, requireGuildScope, searchGuild, voiceGuild
+    requireChannelScope, requireDMs, requireGuildScope, requireIds, searchGuild, voiceGuild
 } from "../vencord-plugin/scope.ts";
 
 const scope = (overrides = {}) => ({ readonlyMode: false, allowDMs: false, allowedGuilds: [], ...overrides });
@@ -106,4 +106,23 @@ test("voiceGuild accepts only voice and stage channels in a guild", () => {
     for (const channel of [{ id: "x", type: 0, guild_id: "1" }, { id: "x", type: 1 }, { id: "x", type: 2 }, null]) {
         assert.throws(() => voiceGuild(channel, "x"), /not a voice or stage channel in a guild/);
     }
+});
+
+test("requireIds refuses anything but a snowflake in an ID argument", () => {
+    const id = "123456789012345678";
+    requireIds("search_messages", { guild_id: id, channel_id: id, author_id: id, query: "../x" });
+    requireIds("send_message", { channel_id: id, reply_to: null });
+    // "../" would let the ID reach another REST route, such as /users/@me/channels.
+    for (const bad of ["../users/@me", `../channels/${id}`, "1", "", "12345678901234567890123", 123456789012345678]) {
+        assert.throws(() => requireIds("list_channels", { guild_id: bad }), /'guild_id' must be a Discord ID/, String(bad));
+    }
+    for (const key of ["channel_id", "message_id", "user_id", "reply_to", "parent_id", "author_id"]) {
+        assert.throws(() => requireIds("x", { [key]: "../x" }), new RegExp(`'${key}' must be a Discord ID`));
+    }
+});
+
+test("requireIds checks message cursors only for read_messages", () => {
+    assert.throws(() => requireIds("read_messages", { channel_id: "123456789012345678", before: "../x" }), /'before' must be a Discord ID/);
+    // list_threads takes an ISO 8601 timestamp as before.
+    requireIds("list_threads", { channel_id: "123456789012345678", before: "2026-10-01T00:00:00Z" });
 });

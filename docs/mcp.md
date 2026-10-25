@@ -178,8 +178,9 @@ the endpoint cannot find the request ID, the error has `id: null`.
 
 The endpoint examines the tool arguments with the input schema of the tool. A necessary argument
 must be present, each argument must have the correct type, and other arguments are not permitted.
-An optional argument with the value `null` is the same as no argument. If an argument is not
-correct, the result has `isError: true`, and the Discord page does not get the call.
+Each ID must be a Discord ID: 15 to 20 digits. An optional argument with the value `null` is the
+same as no argument. If an argument is not correct, the result has `isError: true`, and the Discord
+page does not get the call. The Discord page also examines the IDs again before it uses them.
 
 If the body has more than 4,000,000 bytes, the endpoint does not send 413. It closes the
 connection.

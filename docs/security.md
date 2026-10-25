@@ -45,6 +45,8 @@ The repo does not contain the token. The plugin makes the token at the first sta
 - If `respectDiscordPerms` is on, the plugin examines your Discord permissions before each call.
 - The endpoint examines the tool arguments with the input schema of the tool. The Discord page
   gets only calls with correct arguments.
+- Each ID must have only digits. Thus an ID cannot change the path of a Discord API call, for
+  example to get to DMs when `allowDMs` is off. The endpoint and the Discord page both examine this.
 - No tool accepts a local file path. An agent cannot send a file from your computer.
 - The plugin does not use the Discord endpoint that marks a channel as read.
 

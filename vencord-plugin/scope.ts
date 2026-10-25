@@ -16,8 +16,26 @@ export const READ_ACTIONS = new Set([
 ]);
 
 export const THREAD_TYPES = new Set([10, 11, 12]);
+
+// IDs land in REST paths: "../users/@me" as a guild_id reached the DM routes past allowDMs.
+// native.ts checks the same set against its schemas; this is the second line.
+const SNOWFLAKE = /^[0-9]{15,20}$/;
+const ID_PARAMS = ["guild_id", "channel_id", "message_id", "user_id", "reply_to", "parent_id", "author_id"];
+const MESSAGE_CURSORS = ["before", "after", "around"];
 const DM_TYPES = new Set([1, 3]);
 const VOICE_TYPES = new Set([2, 13]);
+
+// list_threads takes an ISO 8601 before, so only read_messages has ID cursors.
+export function requireIds(action: string, params: Record<string, unknown>): void {
+    const keys = action === "read_messages" ? [...ID_PARAMS, ...MESSAGE_CURSORS] : ID_PARAMS;
+    for (const key of keys) {
+        const value = params[key];
+        if (value === undefined || value === null) continue;
+        if (typeof value !== "string" || !SNOWFLAKE.test(value)) {
+            throw new Error(`${action}: '${key}' must be a Discord ID (15 to 20 digits)`);
+        }
+    }
+}
 
 export function parseAllowedGuilds(raw: string): string[] {
     return raw.split(",").map(s => s.trim()).filter(Boolean);

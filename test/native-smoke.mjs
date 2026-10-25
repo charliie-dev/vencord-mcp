@@ -140,6 +140,9 @@ test("tools/list exposes the full catalog as a cacheable result", async () => {
     assert.ok(read.inputSchema.properties.before);
     for (const tool of result.tools) {
         assert.equal(tool.inputSchema.type, "object");
+        for (const [key, property] of Object.entries(tool.inputSchema.properties)) {
+            if (key.endsWith("_id") || key === "reply_to") assert.equal(property.pattern, "^[0-9]{15,20}$", `${tool.name}.${key}`);
+        }
     }
 });
 
@@ -280,7 +283,7 @@ test("a call arriving while the renderer is busy after an idle period is queued,
 
     const first = rpc("tools/call", { name: "list_guilds", arguments: {} });
     const call1 = await polled;
-    const second = rpc("tools/call", { name: "list_roles", arguments: { guild_id: "1" } });
+    const second = rpc("tools/call", { name: "list_roles", arguments: { guild_id: "234567890123456789" } });
     await new Promise(resolve => setTimeout(resolve, 100));
 
     native.complete(fakeEvent(1), call1.id, []);
@@ -301,13 +304,13 @@ test("a call arriving while the renderer is busy after an idle period is queued,
 
 test("permission errors are curated", async () => {
     const polled = native.poll(fakeEvent(1));
-    const resPromise = rpc("tools/call", { name: "send_message", arguments: { channel_id: "42", content: "hi" } });
+    const resPromise = rpc("tools/call", { name: "send_message", arguments: { channel_id: "123456789012345678", content: "hi" } });
     const call = await polled;
     native.complete(fakeEvent(1), call.id, undefined, "not-allowed: send_message in guild 9: missing SEND_MESSAGES");
     const { result } = await (await resPromise).json();
     assert.equal(result.isError, true);
     assert.match(result.content[0].text, /You are not allowed to do send_message/);
-    assert.match(result.content[0].text, /42/);
+    assert.match(result.content[0].text, /123456789012345678/);
 });
 
 test("unknown tools and methods are protocol errors; ping is gone", async () => {
@@ -342,7 +345,7 @@ test("a call that times out in the queue never reaches the renderer", { timeout:
 
     t.mock.timers.enable({ apis: ["setTimeout"] });
     let settled = false;
-    const res = rawRpc("tools/call", { name: "send_message", arguments: { channel_id: "42", content: "hi" } })
+    const res = rawRpc("tools/call", { name: "send_message", arguments: { channel_id: "123456789012345678", content: "hi" } })
         .finally(() => { settled = true; });
     while (!settled) {
         t.mock.timers.tick(15_000);
@@ -364,7 +367,11 @@ test("tool arguments are checked against the input schema before the renderer se
         [{ name: "get_guild_info", arguments: {} }, /'guild_id' is required/],
         [{ name: "get_guild_info", arguments: { guild_id: 1 } }, /'guild_id' must be a string/],
         [{ name: "list_guilds", arguments: { extra: "x" } }, /unknown argument 'extra'/],
-        [{ name: "join_voice", arguments: { channel_id: "1", guild_id: "2" } }, /unknown argument 'guild_id'/]
+        [{ name: "join_voice", arguments: { channel_id: "123456789012345678", guild_id: "234567890123456789" } }, /unknown argument 'guild_id'/],
+        // "../" in an ID would reach another REST route, for example the DM routes past allowDMs.
+        [{ name: "search_messages", arguments: { guild_id: "../channels/123456789012345678", query: "x" } }, /'guild_id' must be a Discord ID/],
+        [{ name: "get_user_info", arguments: { user_id: "../users/@me" } }, /'user_id' must be a Discord ID/],
+        [{ name: "read_messages", arguments: { channel_id: "123456789012345678", before: "1/../x" } }, /'before' must be a Discord ID/]
     ];
     for (const [params, why] of cases) {
         const { result } = await (await rpc("tools/call", params)).json();
@@ -422,9 +429,9 @@ test("a null optional argument counts as not given; a null required one is missi
     assert.match(result.content[0].text, /'guild_id' is required/);
 
     const polled = native.poll(fakeEvent(1));
-    const res = rpc("tools/call", { name: "read_messages", arguments: { channel_id: "1", before: null } });
+    const res = rpc("tools/call", { name: "read_messages", arguments: { channel_id: "123456789012345678", before: null } });
     const call = await polled;
-    assert.deepEqual(call.params, { channel_id: "1" }, "the renderer does not see the null argument");
+    assert.deepEqual(call.params, { channel_id: "123456789012345678" }, "the renderer does not see the null argument");
     native.complete(fakeEvent(1), call.id, []);
     assert.equal((await (await res).json()).result.isError, undefined);
     native.detach(fakeEvent(1));

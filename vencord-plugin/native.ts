@@ -60,7 +60,7 @@ const token = readToken();
 // Every schema is flat: string, number and boolean properties, some required, no extras.
 type InputSchema = {
     type: "object";
-    properties: Record<string, { type: "string" | "number" | "boolean"; description: string; }>;
+    properties: Record<string, { type: "string" | "number" | "boolean"; description: string; pattern?: string; }>;
     required?: string[];
     additionalProperties: false;
 };
@@ -428,6 +428,17 @@ const ANNOTATIONS: Record<string, object> = {
     set_nickname: DESTRUCTIVE, leave_voice: DESTRUCTIVE
 };
 
+// Every ID argument is a snowflake. IDs land in REST paths, and "../" in one let a guild_id
+// reach /channels/<dm>/messages/search past allowDMs. scope.ts checks the same set again.
+const ID_PATTERN = "^[0-9]{15,20}$";
+const ID_ARGUMENTS = new Set(["guild_id", "channel_id", "message_id", "user_id", "reply_to", "parent_id", "author_id"]);
+const MESSAGE_CURSORS = new Set(["before", "after", "around"]);
+for (const tool of TOOLS) {
+    for (const [key, property] of Object.entries(tool.inputSchema.properties)) {
+        if (ID_ARGUMENTS.has(key) || (tool.name === "read_messages" && MESSAGE_CURSORS.has(key))) property.pattern = ID_PATTERN;
+    }
+}
+
 const TOOL_LIST = TOOLS.map(t => ({ ...t, annotations: ANNOTATIONS[t.name] }));
 const TOOL_NAMES = new Set(TOOLS.map(t => t.name));
 
@@ -442,7 +453,9 @@ function argumentError(schema: InputSchema, args: Record<string, unknown>): stri
     for (const [key, value] of Object.entries(args)) {
         const property = schema.properties[key];
         if (!property) return `unknown argument '${key}'`;
-        if (value !== null && typeof value !== property.type) return `'${key}' must be a ${property.type}`;
+        if (value === null) continue;
+        if (typeof value !== property.type) return `'${key}' must be a ${property.type}`;
+        if (property.pattern && !new RegExp(property.pattern).test(value as string)) return `'${key}' must be a Discord ID (15 to 20 digits)`;
     }
     return null;
 }

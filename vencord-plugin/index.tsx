@@ -9,7 +9,7 @@ import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildMemberCountStore, GuildRoleStore, GuildStore, MessageStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
-import { checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permissionTarget, requireChannelScope, requireDMs, requireGuildScope, type Scope, searchGuild, THREAD_TYPES, voiceGuild } from "./scope";
+import { checkReadonly, describeScope, guildAllowed, parseAllowedGuilds, permissionTarget, requireChannelScope, requireDMs, requireGuildScope, requireIds, type Scope, searchGuild, THREAD_TYPES, voiceGuild } from "./scope";
 
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
@@ -176,6 +176,7 @@ async function handleAction(action: string, params: any): Promise<any> {
     // One snapshot of the settings for the whole call, so every check in it agrees.
     const scope = currentScope();
     checkReadonly(action, scope);
+    requireIds(action, params);
     switch (action) {
 
         // ── Guilds ───────────────────────────────────────────────────────
