@@ -80,10 +80,13 @@ test("initialize handshake and notification", async () => {
 
 test("tools/list exposes the full catalog", async () => {
     const body = await (await rpc("tools/list")).json();
-    assert.equal(body.result.tools.length, 28);
+    assert.equal(body.result.tools.length, 29);
     const names = body.result.tools.map(tool => tool.name);
     assert.ok(names.includes("connection_status"));
     assert.ok(names.includes("send_message"));
+    assert.ok(names.includes("list_threads"));
+    const read = body.result.tools.find(tool => tool.name === "read_messages");
+    assert.ok(read.inputSchema.properties.before);
     for (const tool of body.result.tools) {
         assert.equal(tool.inputSchema.type, "object");
     }

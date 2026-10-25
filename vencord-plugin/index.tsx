@@ -7,7 +7,7 @@
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { definePluginSettings } from "@api/Settings";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildStore, PermissionStore, PermissionsBits } from "@webpack/common";
+import { ActiveJoinedThreadsStore, FluxDispatcher, RestAPI, UserStore, ChannelStore, GuildStore, PermissionStore, PermissionsBits } from "@webpack/common";
 
 // ── Discord Internal Modules (lazy-loaded from webpack) ──────────────────────
 
@@ -30,7 +30,7 @@ const settings = definePluginSettings({
 const READ_ACTIONS = new Set([
     "list_guilds", "get_guild_info", "list_channels", "get_channel_info",
     "read_messages", "search_messages", "get_current_user", "get_user_info",
-    "list_guild_members", "list_dms", "list_roles"
+    "list_guild_members", "list_dms", "list_roles", "list_threads"
 ]);
 
 const THREAD_TYPES = new Set([10, 11, 12]);
@@ -104,6 +104,31 @@ function requireChannelPerm(perm: any, channel: any, action: string, permName: s
     if (!PermissionStore.can(perm, target)) {
         throw new Error(`not-allowed: ${action} in #${channel?.name ?? channel?.id ?? "unknown"}: missing ${permName}. Allowed guilds: ${describeScope()}`);
     }
+}
+
+function clampLimit(value: unknown, fallback: number, max: number): number {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1) return fallback;
+    return Math.min(Math.floor(n), max);
+}
+
+// Handles both REST thread objects (snake_case) and ChannelStore records (camelCase).
+function formatThread(c: any, joined?: boolean) {
+    const meta = c.thread_metadata ?? c.threadMetadata ?? {};
+    return {
+        id: c.id,
+        name: c.name,
+        type: CHANNEL_TYPE_NAMES[c.type] || c.type,
+        parent_id: c.parent_id,
+        owner_id: c.owner_id ?? c.ownerId,
+        message_count: c.message_count ?? c.messageCount,
+        member_count: c.member_count ?? c.memberCount,
+        last_message_id: c.last_message_id ?? c.lastMessageId,
+        archived: meta.archived ?? false,
+        archive_timestamp: meta.archive_timestamp ?? meta.archiveTimestamp,
+        locked: meta.locked ?? false,
+        ...(joined === undefined ? {} : { joined })
+    };
 }
 
 function requireGuildPerm(perm: any, guildId: string, action: string, permName: string) {
@@ -242,7 +267,8 @@ async function handleAction(action: string, params: any): Promise<any> {
                 guild_id: c.guild_id, position: c.position,
                 parent_id: c.parent_id, topic: c.topic,
                 nsfw: c.nsfw, bitrate: c.bitrate,
-                user_limit: c.userLimit ?? c.user_limit, rate_limit: c.rateLimitPerUser ?? c.rate_limit_per_user
+                user_limit: c.userLimit ?? c.user_limit, rate_limit: c.rateLimitPerUser ?? c.rate_limit_per_user,
+                ...(THREAD_TYPES.has(c.type) ? { thread: formatThread(c) } : {})
             };
         }
 
@@ -284,11 +310,13 @@ async function handleAction(action: string, params: any): Promise<any> {
             const ch = await requireScopeForChannel(params.channel_id, "read_messages");
             requireChannelPerm(PermissionsBits.VIEW_CHANNEL, ch, "read_messages", "VIEW_CHANNEL");
             requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, ch, "read_messages", "READ_MESSAGE_HISTORY");
-            const limit = Math.min(params.limit || 50, 100);
-            // Use REST API to fetch messages
+            const query: Record<string, any> = { limit: clampLimit(params.limit, 50, 100) };
+            const cursors = ["before", "after", "around"].filter(k => params[k]);
+            if (cursors.length > 1) throw new Error("Give at most one of before, after, around");
+            if (cursors.length) query[cursors[0]] = params[cursors[0]];
             const res = await RestAPI.get({
                 url: `/channels/${params.channel_id}/messages`,
-                query: { limit }
+                query
             });
             return (res.body as any[]).map(m => ({
                 id: m.id,
@@ -300,8 +328,45 @@ async function handleAction(action: string, params: any): Promise<any> {
                 embeds: m.embeds?.length || 0,
                 reactions: m.reactions?.map((r: any) => ({ emoji: r.emoji.name, count: r.count })),
                 reply_to: m.referenced_message?.id,
-                pinned: m.pinned
+                pinned: m.pinned,
+                ...(m.thread ? { thread: { id: m.thread.id, name: m.thread.name, message_count: m.thread.message_count } } : {})
             }));
+        }
+
+        case "list_threads": {
+            const parent = await requireScopeForChannel(params.channel_id, "list_threads");
+            requireChannelPerm(PermissionsBits.VIEW_CHANNEL, parent, "list_threads", "VIEW_CHANNEL");
+            if (params.archived) {
+                requireChannelPerm(PermissionsBits.READ_MESSAGE_HISTORY, parent, "list_threads", "READ_MESSAGE_HISTORY");
+                // Discord answers limit=1 with 400 "Invalid Form Body" (50035); 2 is the smallest it accepts.
+                const query: Record<string, any> = { limit: Math.max(2, clampLimit(params.limit, 50, 100)) };
+                if (params.before) query.before = params.before;
+                const res = await RestAPI.get({ url: `/channels/${params.channel_id}/threads/archived/public`, query });
+                const body = res.body as any;
+                return { has_more: Boolean(body.has_more), threads: (body.threads ?? []).map((t: any) => formatThread(t)) };
+            }
+            // Active threads come from the gateway, not REST: unjoined ones are absent until the
+            // channel has been opened in Discord (measured: 0 before opening a forum, 261 after).
+            // A busy forum overflows an MCP result, so page newest-activity first.
+            const guildId = parent.guild_id;
+            const pick = (entries: Record<string, any> | undefined, joined: boolean) =>
+                Object.values(entries ?? {}).map((e: any) => formatThread(e?.channel ?? e, joined));
+            const all = [
+                ...pick(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(guildId, params.channel_id), true),
+                ...pick(ActiveJoinedThreadsStore.getActiveUnjoinedThreadsForParent(guildId, params.channel_id), false)
+            ];
+            const activity = (t: any) => BigInt(t.last_message_id ?? t.id);
+            all.sort((a, b) => { const x = activity(a), y = activity(b); return x === y ? 0 : x < y ? 1 : -1; });
+            const limit = clampLimit(params.limit, 50, 100);
+            const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
+            return {
+                total: all.length,
+                has_more: offset + limit < all.length,
+                threads: all.slice(offset, offset + limit),
+                note: all.length
+                    ? "Active threads, most recent activity first. Pass archived: true for archived public threads."
+                    : "No active threads in the client cache. Unjoined active threads appear only after the channel has been opened in Discord; pass archived: true for archived public threads."
+            };
         }
 
         case "search_messages": {

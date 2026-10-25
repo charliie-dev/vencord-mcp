@@ -10,7 +10,7 @@ AI Agent <--HTTP /mcp--> Discord main process (native.ts) <--IPC--> Vencord Plug
 
 ## Features
 
-**28 tools** available to any MCP-compatible AI agent:
+**29 tools** available to any MCP-compatible AI agent:
 
 | Category | Tools |
 |---|---|
@@ -19,7 +19,7 @@ AI Agent <--HTTP /mcp--> Discord main process (native.ts) <--IPC--> Vencord Plug
 | **Messages** | `send_message`, `edit_message`, `delete_message`, `read_messages`, `search_messages` |
 | **DMs** | `list_dms`, `send_dm` |
 | **Reactions** | `add_reaction`, `remove_reaction` |
-| **Threads** | `create_thread` |
+| **Threads** | `list_threads`, `create_thread` (read a thread with `read_messages` and its id) |
 | **Users** | `get_current_user`, `get_user_info`, `list_guild_members` |
 | **Voice** | `join_voice`, `leave_voice` |
 | **Roles** | `list_roles` |
