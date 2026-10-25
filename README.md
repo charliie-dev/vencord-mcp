@@ -249,3 +249,6 @@ The smoke test boots the native module on a test port and covers the handshake, 
 ## License
 
 MIT
+
+Based on [sushi-dev55/discord-mcp](https://github.com/sushi-dev55/discord-mcp) and
+[hazre/discord-mcp](https://github.com/hazre/discord-mcp).
