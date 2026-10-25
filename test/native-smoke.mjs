@@ -57,14 +57,34 @@ function rpc(method, params = {}, { token = TOKEN, version = VERSION, headers = 
 }
 
 function rawPost(headers, body = "{}") {
+    return rawExchange(headers, body).then(res => res.status);
+}
+
+// node:http, not fetch: it lets a test send any Host header, and it does not use the global
+// timers that a test may mock.
+function rawExchange(headers, body = "{}") {
     return new Promise((resolve, reject) => {
         const req = request({ host: "127.0.0.1", port: PORT, path: "/mcp", method: "POST", headers }, res => {
-            res.resume();
-            res.on("end", () => resolve(res.statusCode));
+            const chunks = [];
+            res.on("data", chunk => chunks.push(chunk));
+            res.on("end", () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString("utf8") }));
         });
         req.on("error", reject);
         req.end(body);
     });
+}
+
+function rawRpc(method, params) {
+    const headers = {
+        host: `127.0.0.1:${PORT}`,
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+        "mcp-protocol-version": VERSION,
+        "mcp-method": method,
+        ...(method === "tools/call" ? { "mcp-name": params.name } : {})
+    };
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: meta() } });
+    return rawExchange(headers, body).then(res => ({ status: res.status, json: JSON.parse(res.text) }));
 }
 
 async function waitForServer() {
@@ -303,6 +323,31 @@ test("detach releases the polling renderer", async () => {
     const polled = native.poll(fakeEvent(1));
     native.detach(fakeEvent(1));
     assert.equal(await polled, null);
+});
+
+test("a call that times out in the queue never reaches the renderer", { timeout: 5000 }, async t => {
+    // A recent poll keeps the bridge alive, but no renderer waits, so the call is queued.
+    const polled = native.poll(fakeEvent(1));
+    native.detach(fakeEvent(1));
+    assert.equal(await polled, null);
+
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let settled = false;
+    const res = rawRpc("tools/call", { name: "send_message", arguments: { channel_id: "42", content: "hi" } })
+        .finally(() => { settled = true; });
+    while (!settled) {
+        t.mock.timers.tick(15_000);
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    const { json } = await res;
+    assert.match(json.result.content[0].text, /Timeout waiting for plugin response/);
+
+    // Before the fix the renderer still got the call here and sent the message after the
+    // client had seen the timeout.
+    const next = native.poll(fakeEvent(1));
+    native.detach(fakeEvent(1));
+    assert.ok(next instanceof Promise, "the timed-out call was dropped from the queue");
+    assert.equal(await next, null);
 });
 
 after(() => {

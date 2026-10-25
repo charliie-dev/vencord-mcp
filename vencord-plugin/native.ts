@@ -438,6 +438,11 @@ function dispatchCall(action: string, params: Record<string, any>): Promise<unkn
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
             pending.delete(id);
+            // A call still in the queue must not reach the renderer after the client got
+            // the timeout, or a retry sends the message twice. A call already handed over
+            // cannot be recalled.
+            const queued = queue.findIndex(c => c.id === id);
+            if (queued !== -1) queue.splice(queued, 1);
             reject(new Error(`Timeout waiting for plugin response (action: ${action})`));
         }, CALL_TIMEOUT_MS);
         pending.set(id, { resolve, reject, timer, action, params });

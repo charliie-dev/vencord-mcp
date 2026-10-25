@@ -166,3 +166,7 @@ The `-32022` error has `data.supported` (the versions of the endpoint) and `data
 
 If a tool cannot complete the call, the result has `isError: true`. The text of a Discord API error
 is `HTTP <status>: <message> (code <code>)`.
+
+If a call gets no result in 15 seconds, the result is a timeout error. If the Discord page did not
+start the call, the endpoint removes it, and Discord does not do it. If the page started the call,
+the call can complete after the timeout. Thus, before you send a message again, read the channel.
