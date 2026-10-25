@@ -164,6 +164,9 @@ result of `server/discover` and of `tools/list` for 10 minutes (`ttlMs` 600000).
 
 The `-32022` error has `data.supported` (the versions of the endpoint) and `data.requested`.
 
+If the body has more than 4,000,000 bytes, the endpoint does not send 413. It closes the
+connection.
+
 If a tool cannot complete the call, the result has `isError: true`. The text of a Discord API error
 is `HTTP <status>: <message> (code <code>)`.
 

@@ -19,6 +19,7 @@ const TOKEN_PATH = process.env.DISCORD_MCP_TOKEN_FILE ?? join(homedir(), ".confi
 const CALL_TIMEOUT_MS = 15_000;
 const WAITER_FRESH_MS = 15_000;
 const MAX_BODY_BYTES = 1_000_000;
+const DRAIN_LIMIT_BYTES = 4 * MAX_BODY_BYTES;
 const SUPPORTED_VERSIONS = ["2026-07-28"];
 const SERVER_INFO = { name: "discord-mcp", version: "3.0.0" };
 const LIST_TTL_MS = 600_000;
@@ -646,20 +647,27 @@ function send(res: ServerResponse, status: number, body?: unknown, headers: Reco
 
 const rpcError = (code: number, message: string) => ({ jsonrpc: "2.0", error: { code, message } });
 
+// An oversized body is read to the end and discarded: answering or destroying the socket
+// mid-upload resets the connection before the client can read the 413 (measured: an early
+// 413 with Connection: close lost the race about one run in eight). Past DRAIN_LIMIT_BYTES
+// the client is abusive, and the connection is cut.
 function readBody(req: IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
         let size = 0;
         const chunks: Buffer[] = [];
         req.on("data", chunk => {
             size += chunk.length;
-            if (size > MAX_BODY_BYTES) {
+            if (size <= MAX_BODY_BYTES) {
+                chunks.push(chunk);
+            } else if (size > DRAIN_LIMIT_BYTES) {
                 reject(new Error("request body too large"));
                 req.destroy();
-                return;
             }
-            chunks.push(chunk);
         });
-        req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        req.on("end", () => {
+            if (size > MAX_BODY_BYTES) reject(new Error("request body too large"));
+            else resolve(Buffer.concat(chunks).toString("utf8"));
+        });
         req.on("error", reject);
     });
 }
@@ -689,7 +697,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     try {
         body = await readBody(req);
     } catch (e: any) {
-        return send(res, 413, rpcError(-32600, e?.message ?? "bad request"));
+        if (e?.message === "request body too large") return send(res, 413, rpcError(-32600, e.message));
+        return send(res, 400, rpcError(-32600, "bad request"));
     }
 
     let msg: any;

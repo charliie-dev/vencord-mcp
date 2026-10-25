@@ -350,6 +350,46 @@ test("a call that times out in the queue never reaches the renderer", { timeout:
     assert.equal(await next, null);
 });
 
+// Writes the body in 64 KiB chunks with no Content-Length, so the server must count bytes.
+function chunkedPost(totalBytes) {
+    return new Promise((resolve, reject) => {
+        const headers = { host: `127.0.0.1:${PORT}`, authorization: `Bearer ${TOKEN}`, "content-type": "application/json", "transfer-encoding": "chunked" };
+        const req = request({ host: "127.0.0.1", port: PORT, path: "/mcp", method: "POST", headers }, res => {
+            const chunks = [];
+            res.on("data", chunk => chunks.push(chunk));
+            res.on("end", () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString("utf8") }));
+        });
+        req.on("error", reject);
+        const chunk = Buffer.alloc(65_536, "x");
+        let sent = 0;
+        const pump = () => {
+            while (sent < totalBytes) {
+                const piece = chunk.subarray(0, Math.min(chunk.length, totalBytes - sent));
+                sent += piece.length;
+                if (!req.write(piece)) return req.once("drain", pump);
+            }
+            req.end();
+        };
+        pump();
+    });
+}
+
+test("an oversized body gets a 413 response, not a reset connection", async () => {
+    const headers = { host: `127.0.0.1:${PORT}`, authorization: `Bearer ${TOKEN}`, "content-type": "application/json" };
+    // With and without Content-Length (node:http sends it for a body given to end()), the
+    // server reads and discards the body, then answers.
+    const declared = await rawExchange(headers, "x".repeat(1_000_001));
+    assert.equal(declared.status, 413);
+    assert.equal(JSON.parse(declared.text).error.code, -32600);
+    const chunked = await chunkedPost(1_000_001);
+    assert.equal(chunked.status, 413);
+    assert.equal(JSON.parse(chunked.text).error.code, -32600);
+});
+
+test("a chunked body far over the limit has its connection cut", async () => {
+    await assert.rejects(chunkedPost(4_000_001 + 65_536 * 4));
+});
+
 after(() => {
     rmSync(dir, { recursive: true, force: true });
 });

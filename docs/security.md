@@ -14,6 +14,7 @@ vencord-mcp is for one person on one computer. vencord-mcp gives this protection
   endpoint rejects other hosts with 403. This prevents DNS rebinding attacks.
 - The endpoint rejects each request that has an `Origin` header (403). Agents are not browsers.
 - The endpoint accepts only POST requests to `/mcp`. The body can have a maximum of 1,000,000 bytes.
+  If the body has more than 4,000,000 bytes, the endpoint closes the connection.
 
 ## Token and sign-in
 
