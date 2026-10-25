@@ -202,7 +202,7 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
             properties: {
                 channel_id: { type: "string", description: "The channel ID" },
                 message_id: { type: "string", description: "The message ID" },
-                emoji: { type: "string", description: "The emoji to react with (e.g. '👍' or 'custom_emoji:123456')" }
+                emoji: { type: "string", description: "The emoji to react with (e.g. '👍', 'name:123456' or 'a:name:123456' for an animated one)" }
             },
             required: ["channel_id", "message_id", "emoji"],
             additionalProperties: false
@@ -216,7 +216,7 @@ const TOOLS: { name: string; description: string; inputSchema: InputSchema; }[] 
             properties: {
                 channel_id: { type: "string", description: "The channel ID" },
                 message_id: { type: "string", description: "The message ID" },
-                emoji: { type: "string", description: "The emoji to remove" }
+                emoji: { type: "string", description: "The emoji to remove, in the add_reaction format" }
             },
             required: ["channel_id", "message_id", "emoji"],
             additionalProperties: false

@@ -131,6 +131,13 @@ function formatThread(c: any, joined?: boolean) {
     };
 }
 
+// Accepts a unicode emoji, name:id, a:name:id (animated) and the <a:name:id> chat form.
+function parseEmoji(text: string) {
+    const parts = text.replace(/^<|>$/g, "").split(":");
+    if (parts.length < 2) return { id: null, name: text, animated: false };
+    return { id: parts[parts.length - 1], name: parts[parts.length - 2], animated: parts.length === 3 && parts[0] === "a" };
+}
+
 function requireGuildPerm(perm: any, guildId: string, action: string, permName: string) {
     if (!settings.store.respectDiscordPerms) return;
     if (!PermissionStore?.can) return;
@@ -417,29 +424,14 @@ async function handleAction(action: string, params: any): Promise<any> {
         case "add_reaction": {
             const channel = await requireScopeForChannel(params.channel_id, "add_reaction");
             requireChannelPerm(PermissionsBits.ADD_REACTIONS, channel, "add_reaction", "ADD_REACTIONS");
-            // Parse emoji — could be unicode or custom format name:id
-            let emoji: any;
-            if (params.emoji.includes(":")) {
-                const [name, id] = params.emoji.split(":");
-                emoji = { id, name, animated: false };
-            } else {
-                emoji = { id: null, name: params.emoji, animated: false };
-            }
-            await ReactionActions.addReaction(params.channel_id, params.message_id, emoji);
+            await ReactionActions.addReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
             return { success: true };
         }
 
         case "remove_reaction": {
             const rmChannel = await requireScopeForChannel(params.channel_id, "remove_reaction");
             requireChannelPerm(PermissionsBits.ADD_REACTIONS, rmChannel, "remove_reaction", "ADD_REACTIONS");
-            let emoji: any;
-            if (params.emoji.includes(":")) {
-                const [name, id] = params.emoji.split(":");
-                emoji = { id, name, animated: false };
-            } else {
-                emoji = { id: null, name: params.emoji, animated: false };
-            }
-            await ReactionActions.removeReaction(params.channel_id, params.message_id, emoji);
+            await ReactionActions.removeReaction(params.channel_id, params.message_id, parseEmoji(params.emoji));
             return { success: true };
         }
 
