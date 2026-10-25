@@ -104,7 +104,7 @@ The first start generates a shared bearer token at `~/.config/discord-mcp/token`
 
 ### 4. Configure your MCP client
 
-The endpoint is Streamable HTTP at `http://127.0.0.1:7890/mcp` and requires the token as a bearer header. It speaks MCP revision **2026-07-28 only** (stateless: no `initialize` handshake, no sessions), so the client must support that revision; legacy clients get an `UnsupportedProtocolVersionError` naming it.
+The endpoint is Streamable HTTP at `http://127.0.0.1:7890/mcp` and requires the token as a bearer header. It speaks MCP revision **2026-07-28 only** (stateless: no `initialize` handshake, no sessions), so the client must support that revision; legacy clients get an `UnsupportedProtocolVersionError` naming it. Verified with Claude Code 2.1.310.
 
 #### Claude Code
 
