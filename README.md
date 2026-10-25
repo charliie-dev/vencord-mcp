@@ -59,7 +59,7 @@ mise run deploy
 ## Development
 
 ```bash
-nub run test      # the protocol smoke test (Discord is not necessary)
+nub run test      # the smoke test and the unit tests (Discord is not necessary)
 mise run deploy   # copy the plugin into Vencord and build Vencord
 ```
 
