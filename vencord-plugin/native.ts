@@ -385,6 +385,27 @@ const TOOLS = [
     }
 ];
 
+// Hints for the client only; readonlyMode and the scope checks in index.tsx are the real gate.
+// The readOnlyHint set must equal READ_ACTIONS (plus connection_status); the smoke test checks it.
+const READ = { readOnlyHint: true, openWorldHint: true };
+const ADDITIVE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
+const ADDITIVE_IDEMPOTENT = { ...ADDITIVE, idempotentHint: true };
+const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true };
+
+const ANNOTATIONS: Record<string, object> = {
+    list_guilds: READ, get_guild_info: READ, list_channels: READ, get_channel_info: READ,
+    read_messages: READ, list_threads: READ, search_messages: READ, get_current_user: READ,
+    get_user_info: READ, list_guild_members: READ, list_dms: READ, list_roles: READ,
+    connection_status: { readOnlyHint: true, openWorldHint: false },
+    send_message: ADDITIVE, send_dm: ADDITIVE, create_thread: ADDITIVE, create_channel: ADDITIVE,
+    add_reaction: ADDITIVE_IDEMPOTENT, pin_message: ADDITIVE_IDEMPOTENT, start_typing: ADDITIVE_IDEMPOTENT,
+    join_voice: ADDITIVE_IDEMPOTENT,
+    edit_message: DESTRUCTIVE, delete_message: DESTRUCTIVE, remove_reaction: DESTRUCTIVE,
+    unpin_message: DESTRUCTIVE, delete_channel: DESTRUCTIVE, set_status: DESTRUCTIVE,
+    set_nickname: DESTRUCTIVE, leave_voice: DESTRUCTIVE
+};
+
+const TOOL_LIST = TOOLS.map(t => ({ ...t, annotations: ANNOTATIONS[t.name] }));
 const TOOL_NAMES = new Set(TOOLS.map(t => t.name));
 
 // ── Renderer bridge ──────────────────────────────────────────────────────────
@@ -571,7 +592,7 @@ async function handleRpc(method: string, params: any): Promise<object> {
                 cacheScope: "public"
             });
         case "tools/list":
-            return asResult({ tools: TOOLS, ttlMs: LIST_TTL_MS, cacheScope: "public" });
+            return asResult({ tools: TOOL_LIST, ttlMs: LIST_TTL_MS, cacheScope: "public" });
         case "tools/call": {
             const name: string = params?.name;
             const args: Record<string, any> = params?.arguments ?? {};

@@ -6,7 +6,7 @@
  * Requires Node >= 23.6 (type stripping); run with: npm test
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -110,6 +110,27 @@ test("tools/list exposes the full catalog as a cacheable result", async () => {
     for (const tool of result.tools) {
         assert.equal(tool.inputSchema.type, "object");
     }
+});
+
+test("every tool is annotated, and readOnlyHint matches the renderer's READ_ACTIONS", async () => {
+    const { result } = await (await rpc("tools/list")).json();
+    for (const tool of result.tools) {
+        assert.equal(typeof tool.annotations?.readOnlyHint, "boolean", `${tool.name} has readOnlyHint`);
+        if (!tool.annotations.readOnlyHint) {
+            assert.equal(typeof tool.annotations.destructiveHint, "boolean", `${tool.name} has destructiveHint`);
+        }
+    }
+    // READ_ACTIONS is what readonlyMode lets through; a hint that disagrees with it would
+    // tell the client a blocked tool is safe, or a safe tool is blocked.
+    const source = readFileSync(new URL("../vencord-plugin/index.tsx", import.meta.url), "utf8");
+    const block = source.match(/const READ_ACTIONS = new Set\(\[([\s\S]*?)\]\)/);
+    assert.ok(block, "READ_ACTIONS found in index.tsx");
+    const readActions = [...block[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1]).concat("connection_status").sort();
+    const readOnly = result.tools.filter(t => t.annotations.readOnlyHint).map(t => t.name).sort();
+    assert.deepEqual(readOnly, readActions);
+    const destructive = result.tools.filter(t => t.annotations.destructiveHint).map(t => t.name);
+    assert.ok(destructive.includes("delete_channel") && destructive.includes("delete_message"));
+    assert.ok(!destructive.includes("send_message"));
 });
 
 test("legacy initialize is refused and names the supported revision", async () => {
