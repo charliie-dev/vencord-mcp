@@ -67,6 +67,9 @@ lockfile. This setup does not change it.
 To change the settings, open User Settings > Vencord > Plugins > MCPBridge. The plugin reads the
 settings again for each call. Thus a change has an effect on the next call.
 
+The settings page shows a label for each setting. For example, the label of `allowDMs` is Allow
+Direct Messages. This document uses the setting names.
+
 | Setting               | Default | Function                                                                        |
 | --------------------- | ------- | ------------------------------------------------------------------------------- |
 | `readonlyMode`        | on      | Stops all tools that change data. Only the read tools operate                   |
