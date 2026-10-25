@@ -665,7 +665,7 @@ async function handleAction(action: string, params: any): Promise<any> {
 export default definePlugin({
     name: "MCPBridge",
     description: "Bridge between Discord and MCP server — lets AI agents control Discord",
-    authors: [{ name: "Sushi", id: 0n }],
+    authors: [{ name: "charliie", id: 1115139062299373578n }],
     required: false,
     settings,
 
