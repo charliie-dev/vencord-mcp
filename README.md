@@ -4,6 +4,8 @@ vencord-mcp is a Vencord user plugin for Vesktop. The plugin adds an MCP endpoin
 this endpoint, an AI agent can read and send Discord messages with your account. You control the
 tasks that the agent can do.
 
+https://github.com/user-attachments/assets/98e81007-800e-43d9-8ebc-21452b8aa8f9
+
 > [!WARNING]
 > Use vencord-mcp only for your account, on your computer. Changes to the Discord client, such as
 > Vencord, are against the Discord Terms of Service. If an agent sends messages with your account,
