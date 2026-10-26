@@ -23,3 +23,38 @@ nub --cwd "$VENCORD_DIR" run build
 # native.ts runs in Vesktop's main process, so a renderer reload (Cmd+R) does not pick it up.
 echo "built $VENCORD_DIR/dist; quit Vesktop (Cmd+Q) and reopen to load the new build"
 '''
+
+# The README demo video (demo/index.html), rendered with HyperFrames. Its fonts and GSAP come
+# from devDependencies, so the render needs no network; ffmpeg is installed for these tasks only.
+[tasks."demo:assets"]
+description = "Copy the demo's pinned fonts and GSAP from node_modules into demo/vendor (gitignored)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p demo/vendor
+cp node_modules/gsap/dist/gsap.min.js demo/vendor/
+for w in 400 500 600 700; do cp "node_modules/@fontsource/inter/files/inter-latin-$w-normal.woff2" demo/vendor/; done
+for w in 400 700; do cp "node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-$w-normal.woff2" demo/vendor/; done
+'''
+
+[tasks."demo:check"]
+description = "Lint the demo composition and audit its layout, motion and contrast"
+depends = ["demo:assets"]
+env = { HYPERFRAMES_NO_TELEMETRY = "1" }
+tools = { "conda:ffmpeg" = "8.1.2" }
+run = "nub exec hyperframes check demo"
+
+[tasks."demo:snapshot"]
+description = "Capture still frames of the demo into demo/snapshots: mise run demo:snapshot 2,9,14"
+depends = ["demo:assets"]
+env = { HYPERFRAMES_NO_TELEMETRY = "1" }
+tools = { "conda:ffmpeg" = "8.1.2" }
+usage = 'arg "<times>" help="Comma-separated seconds"'
+run = "nub exec hyperframes snapshot demo --at ${usage_times?}"
+
+[tasks."demo:render"]
+description = "Render the demo video to demo/renders/vencord-mcp.mp4"
+depends = ["demo:assets"]
+env = { HYPERFRAMES_NO_TELEMETRY = "1" }
+tools = { "conda:ffmpeg" = "8.1.2" }
+run = "nub exec hyperframes render demo --output demo/renders/vencord-mcp.mp4"

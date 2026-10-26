@@ -1,4 +1,9 @@
 node_modules/
+
+# Demo video: assets copied from node_modules, and HyperFrames output
+demo/vendor/
+demo/renders/
+demo/snapshots/
 vencord-src/
 .mcp.json
 GLOSSARY.md

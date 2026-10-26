@@ -3,7 +3,9 @@
 ## Tools
 
 mise installs nub (refer to `mise.toml`). nub installs Node (the version in `.node-version`) and
-starts the scripts in `package.json`. The repo has no package dependencies.
+starts the scripts in `package.json`. The plugin and the tests have no package dependencies. The
+`devDependencies` are only for the [demo video](#demo-video). Each has an exact version.
+`nub.jsonc` stops nub from installing a version that is newer than 14 days.
 
 | Command           | Function                                                           |
 | ----------------- | ------------------------------------------------------------------ |
@@ -22,8 +24,10 @@ After `deploy`, stop Vesktop fully (Cmd+Q) and start it again. Refer to
 | `vencord-plugin/scope.ts`  | The access rules: `READ_ACTIONS`, `readonlyMode`, the server list and DMs. `index.tsx` uses it                      |
 | `test/native-smoke.mjs`    | The smoke test for `native.ts`                                                                                      |
 | `test/scope.test.mjs`      | The unit tests for `scope.ts`                                                                                       |
-| `mise.toml`                | nub, `VENCORD_DIR` and the `deploy` task                                                                            |
+| `mise.toml`                | nub, `VENCORD_DIR`, the `deploy` task and the `demo:*` tasks                                                        |
 | `.node-version`            | The Node version that nub installs                                                                                  |
+| `nub.jsonc`                | The minimum age (14 days) of a package version that nub installs                                                    |
+| `demo/index.html`          | The README demo video, as a HyperFrames composition                                                                 |
 | `docs/`                    | These documents                                                                                                     |
 
 `native.ts` sends each call to `index.tsx` through the plugin IPC of Vencord. `index.tsx` gets the
@@ -71,6 +75,52 @@ this code in Vesktop.
    ```
 
 7. Copy the plugin into Vencord and build Vencord. Then test the tool in Vesktop.
+
+## Demo video
+
+The README video is `demo/index.html`. HyperFrames renders this page to an MP4 file: headless
+Chrome captures each frame, and ffmpeg encodes the frames. The same input gives the same video. All
+the servers, persons and IDs in the video are mock data.
+
+| Command                         | Function                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `mise run demo:check`           | Examines the page: the HyperFrames rules, the layout, the motion, contrast |
+| `mise run demo:snapshot 2,9,14` | Captures a frame at each of these seconds into `demo/snapshots/`           |
+| `mise run demo:render`          | Renders `demo/renders/vencord-mcp.mp4`: 1920×1080, 30 fps, 48 s, no audio  |
+
+- Before the first task, do `nub install`.
+- Each task first copies GSAP and the fonts from `node_modules` into `demo/vendor/`. Thus the
+  render does not use the network.
+- mise installs ffmpeg only for these tasks.
+- At the first render, HyperFrames downloads chrome-headless-shell into `~/.cache/hyperframes/`.
+- The tasks set `HYPERFRAMES_NO_TELEMETRY=1`. HyperFrames sends telemetry by default.
+- Git does not keep `demo/vendor/`, `demo/snapshots/` and `demo/renders/`.
+- Do not use `hyperframes init`, because it writes skills into the repo. Do not use
+  `hyperframes feedback`, because it sends to a public channel. Do not use `hyperframes publish`.
+
+If the first render gives the error `FFmpeg cannot start`, examine ffmpeg. Then render again.
+
+```bash
+HYPERFRAMES_NO_TELEMETRY=1 mise x conda:ffmpeg@8.1.2 -- nub exec hyperframes doctor
+```
+
+### Replace the video
+
+1. Change `demo/index.html`. If you change the name, the colors or the text, also change the
+   `<title>`, the composition ID, the title card, the end card and the file name in the
+   `demo:render` task.
+2. Do `mise run demo:check`. Correct each error. If two layers overlap because you want them to,
+   add `data-layout-allow-overlap` or `data-layout-allow-overflow` to the element.
+3. Do `mise run demo:snapshot` with the important seconds. Make each highlight, click and small
+   text larger, for example with `magick <frame> -crop <geometry> -resize 200%`. A small error of
+   some pixels is not visible in the contact sheet.
+4. Do `mise run demo:render`. With `ffprobe`, examine the size, the frame rate, the number of
+   frames, the duration and the file size. The file must be smaller than 10 MB for GitHub.
+5. Format the page with prettier and render again. With the `psnr` filter of ffmpeg, compare the
+   new video with the previous video. The result must be `inf`.
+6. On github.com, edit `README.md` and drag the MP4 file into the editor. GitHub uploads the file
+   and adds its `user-attachments` URL. Replace the old URL with the new URL. Keep the URL on its
+   own line.
 
 ## Commits
 

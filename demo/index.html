@@ -1,0 +1,1705 @@
+<!doctype html>
+<!--
+  The README demo video, as a HyperFrames composition (https://hyperframes.heygen.com).
+  Everything on screen is a mock with made-up servers, people and IDs; nothing comes from Discord.
+  `mise run demo:render` copies the pinned fonts and GSAP into demo/vendor/ and renders it.
+-->
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>vencord-mcp demo</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        src: url("vendor/inter-latin-400-normal.woff2") format("woff2");
+        font-weight: 400;
+      }
+      @font-face {
+        font-family: "Inter";
+        src: url("vendor/inter-latin-500-normal.woff2") format("woff2");
+        font-weight: 500;
+      }
+      @font-face {
+        font-family: "Inter";
+        src: url("vendor/inter-latin-600-normal.woff2") format("woff2");
+        font-weight: 600;
+      }
+      @font-face {
+        font-family: "Inter";
+        src: url("vendor/inter-latin-700-normal.woff2") format("woff2");
+        font-weight: 700;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("vendor/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+        font-weight: 400;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("vendor/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+        font-weight: 700;
+      }
+
+      /* Catppuccin Mocha. Not Discord's palette, so the mock does not pass for the real client. */
+      :root {
+        --red: #f38ba8;
+        --peach: #fab387;
+        --yellow: #f9e2af;
+        --green: #a6e3a1;
+        --blue: #89b4fa;
+        --lavender: #b4befe;
+        --mauve: #cba6f7;
+        --pink: #f5c2e7;
+        --text: #cdd6f4;
+        --subtext1: #bac2de;
+        --subtext0: #a6adc8;
+        --overlay2: #9399b2;
+        --overlay1: #7f849c;
+        --overlay0: #6c7086;
+        --surface2: #585b70;
+        --surface1: #45475a;
+        --surface0: #313244;
+        --base: #1e1e2e;
+        --mantle: #181825;
+        --crust: #11111b;
+      }
+      body {
+        margin: 0;
+        background: var(--crust);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Inter", sans-serif;
+        color: var(--text);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+      svg {
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      #bg {
+        background:
+          radial-gradient(
+            1200px 700px at 12% 8%,
+            rgba(203, 166, 247, 0.11),
+            transparent 62%
+          ),
+          radial-gradient(
+            1100px 760px at 92% 96%,
+            rgba(137, 180, 250, 0.09),
+            transparent 62%
+          ),
+          var(--crust);
+      }
+
+      /* Title and end cards */
+      .card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .mark {
+        margin: 0;
+        font-size: 156px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+      .mark em {
+        font-style: normal;
+        color: var(--mauve);
+      }
+      #title-sub {
+        margin: 36px 0 0;
+        max-width: 1280px;
+        font-size: 42px;
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--subtext1);
+      }
+      #title-chips {
+        display: flex;
+        gap: 20px;
+        margin-top: 56px;
+      }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 26px;
+        border: 1px solid var(--surface1);
+        border-radius: 999px;
+        background: var(--surface0);
+        font-size: 26px;
+        font-weight: 600;
+        color: var(--subtext1);
+      }
+      .chip i {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+      }
+      #end-mark {
+        font-size: 128px;
+      }
+      #end-list {
+        margin: 56px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        align-items: flex-start;
+      }
+      #end-list li {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 36px;
+        font-weight: 500;
+        color: var(--subtext1);
+      }
+      #end-list svg {
+        width: 40px;
+        height: 40px;
+        color: var(--green);
+        stroke-width: 2.4;
+      }
+      #end-note {
+        margin-top: 72px;
+        font-size: 22px;
+        color: var(--overlay2);
+      }
+
+      /* How it works: agent -> plugin -> Discord page */
+      #diagram {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #diagram-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: -80px;
+      }
+      .flow {
+        display: flex;
+        align-items: center;
+      }
+      .node {
+        width: 380px;
+        height: 230px;
+        box-sizing: border-box;
+        padding: 30px 32px;
+        border: 1px solid var(--surface1);
+        border-radius: 20px;
+        background: var(--mantle);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      }
+      .node-ico {
+        width: 64px;
+        height: 64px;
+        display: grid;
+        place-items: center;
+        border-radius: 16px;
+        background: var(--surface0);
+      }
+      .node-ico svg {
+        width: 34px;
+        height: 34px;
+      }
+      .node-title {
+        margin-top: 24px;
+        font-size: 32px;
+        font-weight: 700;
+      }
+      .node-sub {
+        margin-top: 8px;
+        font-size: 21px;
+        color: var(--subtext0);
+      }
+      .link {
+        width: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .link-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 17px;
+        color: var(--subtext0);
+        white-space: nowrap;
+      }
+      .link svg {
+        width: 168px;
+        height: 24px;
+        color: var(--mauve);
+        stroke-width: 2.4;
+      }
+      #diagram-note {
+        margin-top: 64px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 28px;
+        font-weight: 500;
+        color: var(--subtext1);
+      }
+      #diagram-note svg {
+        width: 32px;
+        height: 32px;
+        color: var(--green);
+        stroke-width: 2.4;
+      }
+
+      /* Captions */
+      .cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 54px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .kicker {
+        padding: 6px 16px;
+        border-radius: 8px;
+        background: rgba(203, 166, 247, 0.14);
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--mauve);
+      }
+      .cap-line {
+        font-size: 42px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* The client window. It scales about its right edge to make room for the terminal. */
+      #win {
+        position: absolute;
+        left: 160px;
+        top: 64px;
+        width: 1600px;
+        height: 800px;
+        border: 1px solid var(--surface0);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--mantle);
+        box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55);
+        transform-origin: 100% 50%;
+      }
+      .titlebar {
+        position: relative;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--crust);
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--subtext0);
+      }
+      .dots {
+        position: absolute;
+        left: 20px;
+        top: 14px;
+        display: flex;
+        gap: 9px;
+      }
+      .dots i {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: var(--surface1);
+      }
+      .page {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 40px;
+        bottom: 0;
+        display: flex;
+      }
+
+      .rail {
+        flex: none;
+        width: 88px;
+        padding-top: 14px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        background: var(--crust);
+      }
+      .srv {
+        position: relative;
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--surface0);
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--crust);
+      }
+      .srv svg {
+        width: 28px;
+        height: 28px;
+      }
+      .srv.home {
+        border-radius: 18px;
+        color: var(--lavender);
+      }
+      .srv.add {
+        color: var(--green);
+      }
+      .srv.active {
+        border-radius: 18px;
+      }
+      .srv.active::before {
+        content: "";
+        position: absolute;
+        left: -16px;
+        top: 8px;
+        width: 5px;
+        height: 40px;
+        border-radius: 0 4px 4px 0;
+        background: var(--text);
+      }
+      .rail-sep {
+        width: 34px;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--surface0);
+      }
+
+      .side {
+        position: relative;
+        flex: none;
+        width: 300px;
+        background: var(--mantle);
+      }
+      .side-head {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--crust);
+        font-size: 19px;
+        font-weight: 700;
+      }
+      .side-head svg {
+        width: 20px;
+        height: 20px;
+        color: var(--subtext0);
+      }
+      .channels {
+        padding: 10px 10px 0;
+      }
+      .cat {
+        margin: 14px 0 6px 8px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--overlay2);
+      }
+      .ch {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--overlay2);
+      }
+      .ch b {
+        width: 20px;
+        font-size: 22px;
+        font-weight: 400;
+        text-align: center;
+        color: var(--overlay1);
+      }
+      .ch svg {
+        width: 20px;
+        height: 20px;
+      }
+      .ch.active {
+        background: var(--surface0);
+        color: var(--text);
+      }
+      .ch.active b {
+        color: var(--subtext0);
+      }
+      .thread {
+        position: relative;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        margin-left: 40px;
+        padding: 0 10px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--overlay2);
+      }
+      .thread::before {
+        content: "";
+        position: absolute;
+        left: -18px;
+        top: -6px;
+        width: 14px;
+        height: 22px;
+        border-left: 2px solid var(--surface1);
+        border-bottom: 2px solid var(--surface1);
+        border-bottom-left-radius: 8px;
+      }
+      .user {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 66px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 14px;
+        box-sizing: border-box;
+        background: #141420;
+      }
+      .user .av {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+      }
+      .status {
+        position: absolute;
+        right: -2px;
+        bottom: -2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 3px solid #141420;
+        background: var(--green);
+      }
+      .user-name {
+        flex: 1;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+      .user-name span {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--subtext0);
+      }
+      .user-ico {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--subtext0);
+      }
+      .user-ico svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .chat {
+        position: relative;
+        flex: 1;
+        background: var(--base);
+      }
+      .chat-head {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--crust);
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .chat-head b {
+        font-size: 24px;
+        font-weight: 400;
+        color: var(--overlay1);
+      }
+      .topic {
+        padding-left: 14px;
+        border-left: 1px solid var(--surface1);
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--subtext0);
+      }
+      .msgs {
+        padding: 18px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .day {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--overlay2);
+      }
+      .day::before,
+      .day::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--surface0);
+      }
+      .msg {
+        position: relative;
+        display: flex;
+        gap: 16px;
+      }
+      .av {
+        position: relative;
+        flex: none;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--crust);
+      }
+      .who {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 19px;
+        font-weight: 600;
+      }
+      .who time {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--overlay2);
+      }
+      .text {
+        margin-top: 4px;
+        font-size: 20px;
+        line-height: 1.4;
+        color: var(--subtext1);
+      }
+      #m4 {
+        flex-wrap: wrap;
+      }
+      .reply-ref {
+        position: relative;
+        flex-basis: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 -10px 62px;
+        font-size: 15px;
+        color: var(--subtext0);
+      }
+      .reply-ref::before {
+        content: "";
+        position: absolute;
+        left: -40px;
+        top: 10px;
+        width: 30px;
+        height: 12px;
+        border-left: 2px solid var(--surface2);
+        border-top: 2px solid var(--surface2);
+        border-top-left-radius: 7px;
+      }
+      .reply-ref .av {
+        width: 18px;
+        height: 18px;
+        font-size: 9px;
+      }
+      .reply-ref b {
+        font-weight: 600;
+        color: var(--pink);
+      }
+      .composer {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        bottom: 24px;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 16px;
+        box-sizing: border-box;
+        border-radius: 10px;
+        background: var(--surface0);
+        font-size: 18px;
+        color: var(--subtext0);
+      }
+      .composer svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      /* Vencord's plugin settings modal. Its backdrop is opaque, like Discord's settings
+         page, so the page under it can be hidden instead of left behind as dimmed text. */
+      .modal-wrap {
+        visibility: hidden;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 40px;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #backdrop {
+        position: absolute;
+        inset: 0;
+        background: var(--crust);
+        opacity: 0;
+      }
+      #modal {
+        position: relative;
+        width: 760px;
+        padding: 26px 32px 14px;
+        box-sizing: border-box;
+        border: 1px solid var(--surface1);
+        border-radius: 14px;
+        background: var(--mantle);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+        opacity: 0;
+      }
+      .crumb {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--overlay2);
+      }
+      .modal-title {
+        margin-top: 6px;
+        font-size: 30px;
+        font-weight: 700;
+      }
+      .modal-desc {
+        margin-top: 8px;
+        font-size: 17px;
+        color: var(--subtext0);
+      }
+      #close {
+        position: absolute;
+        right: 22px;
+        top: 22px;
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--subtext0);
+      }
+      #close svg {
+        width: 22px;
+        height: 22px;
+        stroke-width: 2.2;
+      }
+      .set-head {
+        margin-top: 24px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--overlay2);
+      }
+      .set {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--surface0);
+      }
+      .set:last-child {
+        border-bottom: 0;
+      }
+      .set-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .set-name {
+        font-size: 19px;
+        font-weight: 600;
+      }
+      .set-desc {
+        margin-top: 4px;
+        font-size: 15px;
+        color: var(--subtext0);
+      }
+      #gid {
+        margin-top: 12px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        box-sizing: border-box;
+        border: 1px solid var(--surface1);
+        border-radius: 8px;
+        background: var(--crust);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        color: var(--text);
+      }
+      .typed {
+        display: inline-block;
+      }
+      .toggle {
+        position: relative;
+        flex: none;
+        width: 50px;
+        height: 28px;
+        border-radius: 14px;
+        background: var(--surface2);
+      }
+      .toggle.on {
+        background: var(--green);
+      }
+      .knob {
+        position: absolute;
+        left: 3px;
+        top: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #ffffff;
+      }
+      .toggle.on .knob {
+        left: 25px;
+      }
+
+      /* The agent's terminal */
+      #term {
+        position: absolute;
+        left: 48px;
+        top: 100px;
+        width: 648px;
+        height: 728px;
+        box-sizing: border-box;
+        border: 1px solid var(--surface0);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--mantle);
+        box-shadow: 0 32px 90px rgba(0, 0, 0, 0.6);
+      }
+      .term-bar {
+        position: relative;
+        height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--crust);
+        font-size: 16px;
+        color: var(--overlay2);
+      }
+      .term-bar .dots {
+        top: 16px;
+      }
+      .term-body {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 46px;
+        bottom: 0;
+        overflow: hidden;
+      }
+      #term-lines {
+        padding: 24px 28px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        line-height: 32px;
+      }
+      .tl {
+        position: relative;
+        padding-left: 30px;
+      }
+      .tl.p {
+        margin-top: 22px;
+      }
+      .tl.p:first-child {
+        margin-top: 0;
+      }
+      .tl.call {
+        margin-top: 12px;
+      }
+      .tl.later {
+        display: none;
+      }
+      .pr {
+        position: absolute;
+        left: 0;
+        color: var(--mauve);
+        font-weight: 700;
+      }
+      .dot {
+        position: absolute;
+        left: 4px;
+        top: 10px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      .dot.fail {
+        background: var(--red);
+      }
+      .dot.say {
+        background: var(--text);
+      }
+      .tl b {
+        font-weight: 700;
+      }
+      .arg {
+        color: var(--overlay2);
+      }
+      .res {
+        padding-left: 62px;
+        color: var(--subtext0);
+      }
+      .res.fail {
+        color: var(--red);
+      }
+      .elbow {
+        position: absolute;
+        left: 34px;
+        top: 4px;
+        width: 14px;
+        height: 14px;
+        border-left: 2px solid var(--overlay0);
+        border-bottom: 2px solid var(--overlay0);
+      }
+
+      /* Pointer, click ripples and highlight rings */
+      #cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 34px;
+        height: 40px;
+        opacity: 0;
+        /* The press scales about the tip, so the tip stays on the ripple's center. */
+        transform-origin: 3px 2px;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+      }
+      #cursor svg {
+        width: 34px;
+        height: 40px;
+        fill: #ffffff;
+        stroke: #11111b;
+        stroke-width: 1.6;
+      }
+      #wfx {
+        position: absolute;
+        inset: 0;
+      }
+      /* border-box: a content-box border would push the box off its measured rect. */
+      .ripple {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 56px;
+        height: 56px;
+        box-sizing: border-box;
+        border-radius: 50%;
+        border: 3px solid var(--text);
+        opacity: 0;
+      }
+      .ring {
+        position: absolute;
+        box-sizing: border-box;
+        border: 3px solid var(--mauve);
+        border-radius: 14px;
+        box-shadow: 0 0 18px rgba(203, 166, 247, 0.45);
+        opacity: 0;
+      }
+      .ring.ok {
+        border-color: var(--green);
+        box-shadow: 0 0 18px rgba(166, 227, 161, 0.45);
+      }
+      .ring.danger {
+        border-color: var(--red);
+        box-shadow: 0 0 18px rgba(243, 139, 168, 0.45);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="vencord-mcp-demo"
+      data-start="0"
+      data-width="1920"
+      data-height="1080"
+      data-duration="48"
+    >
+      <div
+        id="bg"
+        class="clip"
+        data-start="0"
+        data-duration="48"
+        data-track-index="0"
+      ></div>
+
+      <section
+        id="stage"
+        class="clip"
+        data-start="0"
+        data-duration="44.4"
+        data-track-index="1"
+      >
+        <div id="win">
+          <div class="titlebar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            #help · Pixel Guild
+          </div>
+          <div class="page">
+            <nav class="rail">
+              <div class="srv home">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /></svg>
+              </div>
+              <div class="rail-sep"></div>
+              <div class="srv active" style="background: #cba6f7">PG</div>
+              <div id="srv-rl" class="srv" style="background: #fab387">RL</div>
+              <div class="srv" style="background: #a6e3a1">WH</div>
+              <div class="srv add">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+              </div>
+            </nav>
+
+            <aside class="side">
+              <div class="side-head">
+                Pixel Guild
+                <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </div>
+              <div class="channels">
+                <div class="cat">TEXT CHANNELS</div>
+                <div class="ch"><b>#</b>general</div>
+                <div class="ch active"><b>#</b>help</div>
+                <div id="thread-build" class="thread">Build fails on macOS</div>
+                <div class="thread">Dark theme request</div>
+                <div class="ch"><b>#</b>releases</div>
+                <div class="ch"><b>#</b>showcase</div>
+                <div class="cat">VOICE CHANNELS</div>
+                <div class="ch">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M11 5 6 9H3v6h3l5 4z" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+                  </svg>
+                  Hangout
+                </div>
+              </div>
+              <div class="user">
+                <div class="av" style="background: #b4befe">
+                  S<i class="status"></i>
+                </div>
+                <div class="user-name">sam<span>Online</span></div>
+                <div class="user-ico">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8" />
+                  </svg>
+                </div>
+                <div class="user-ico">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                    <path
+                      d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"
+                    />
+                  </svg>
+                </div>
+                <div id="gear" class="user-ico">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </aside>
+
+            <main class="chat">
+              <div class="chat-head">
+                <b>#</b>help
+                <span class="topic">Questions about Pixel Guild builds</span>
+              </div>
+              <div class="msgs">
+                <div class="day">Today</div>
+                <div id="msgs-today">
+                  <div class="msg">
+                    <div class="av" style="background: #f5c2e7">MP</div>
+                    <div>
+                      <div class="who">Mia Park<time>9:12 AM</time></div>
+                      <div class="text">
+                        The macOS build fails after the update. Anyone else?
+                      </div>
+                    </div>
+                  </div>
+                  <div class="msg" style="margin-top: 22px">
+                    <div class="av" style="background: #a6e3a1">KI</div>
+                    <div>
+                      <div class="who">Ken Ito<time>9:20 AM</time></div>
+                      <div class="text">Same here, since v2.0.</div>
+                    </div>
+                  </div>
+                  <div class="msg" style="margin-top: 22px">
+                    <div class="av" style="background: #fab387">RS</div>
+                    <div>
+                      <div class="who">Ravi Shah<time>10:05 AM</time></div>
+                      <div class="text">
+                        Can I turn on the dark theme early?
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="m4" class="msg">
+                  <div class="reply-ref">
+                    <span class="av" style="background: #f5c2e7"></span
+                    ><b>Mia Park</b>The macOS build fails after the update.
+                  </div>
+                  <div class="av" style="background: #b4befe">S</div>
+                  <div>
+                    <div class="who">sam<time>10:31 AM</time></div>
+                    <div class="text">The fix ships in v2.1.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="composer">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+                Message #help
+              </div>
+            </main>
+          </div>
+
+          <div class="modal-wrap">
+            <div id="backdrop"></div>
+            <div id="modal">
+              <div class="crumb">Vencord · Plugins</div>
+              <div class="modal-title">MCPBridge</div>
+              <div class="modal-desc">
+                Bridge between Discord and MCP server
+              </div>
+              <div id="close">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </div>
+              <div class="set-head">SETTINGS</div>
+              <div class="set">
+                <div class="set-name">Allowed Guild Ids</div>
+                <div class="set-desc">
+                  Comma-separated guild IDs (empty = all)
+                </div>
+                <div id="gid">
+                  <span id="gid-text" class="typed">112233445566778899</span>
+                </div>
+              </div>
+              <div id="set-dms" class="set">
+                <div class="set-row">
+                  <div>
+                    <div class="set-name">Allow Direct Messages</div>
+                    <div class="set-desc">Allow DM tools</div>
+                  </div>
+                  <div class="toggle"><i class="knob"></i></div>
+                </div>
+              </div>
+              <div class="set">
+                <div class="set-row">
+                  <div>
+                    <div class="set-name">Readonly Mode</div>
+                    <div class="set-desc">Block all mutating actions</div>
+                  </div>
+                  <div id="ro-toggle" class="toggle on">
+                    <i id="ro-knob" class="knob"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="set">
+                <div class="set-row">
+                  <div>
+                    <div class="set-name">Respect Discord Perms</div>
+                    <div class="set-desc">
+                      Pre-flight with PermissionStore.can()
+                    </div>
+                  </div>
+                  <div class="toggle on"><i class="knob"></i></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="wfx"></div>
+        </div>
+
+        <div id="term">
+          <div class="term-bar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            claude · MCP client
+          </div>
+          <div class="term-body">
+            <div id="term-lines">
+              <div class="tl p earlier">
+                <span class="pr">&gt;</span
+                ><span id="p1-text" class="typed"
+                  >What did people ask in #help today?</span
+                >
+              </div>
+              <div id="t1" class="tl call earlier">
+                <span class="dot"></span><b>read_messages</b
+                ><span class="arg">(channel: "#help")</span>
+              </div>
+              <div id="r1" class="tl res earlier">
+                <span class="elbow"></span>3 messages
+              </div>
+              <div id="a1" class="tl call earlier">
+                <span class="dot say"></span>Mia and Ken say the macOS build
+                fails since v2.0. Ravi asks about the dark theme.
+              </div>
+
+              <div id="p2" class="tl p earlier">
+                <span class="pr">&gt;</span
+                ><span id="p2-text" class="typed"
+                  >Is there a thread about the build?</span
+                >
+              </div>
+              <div id="t2" class="tl call earlier">
+                <span class="dot"></span><b>list_threads</b
+                ><span class="arg">(channel: "#help")</span>
+              </div>
+              <div id="r2" class="tl res earlier">
+                <span class="elbow"></span>2 active threads
+              </div>
+              <div id="t3" class="tl call earlier">
+                <span class="dot"></span><b>read_messages</b
+                ><span class="arg">(thread: "Build fails on macOS")</span>
+              </div>
+              <div id="r3" class="tl res earlier">
+                <span class="elbow"></span>50 messages, newest first
+              </div>
+
+              <div id="p3" class="tl p">
+                <span class="pr">&gt;</span
+                ><span id="p3-text" class="typed"
+                  >Reply to Mia: the fix ships in v2.1</span
+                >
+              </div>
+              <div id="t4" class="tl call">
+                <span class="dot fail"></span><b>send_message</b
+                ><span class="arg">(channel: "#help")</span>
+              </div>
+              <div id="r4" class="tl res fail">
+                <span class="elbow"></span>You are not allowed to do
+                send_message …<br />readonlyMode is on.
+              </div>
+
+              <div id="p4" class="tl p later">
+                <span class="pr">&gt;</span
+                ><span id="p4-text" class="typed">OK, send the reply now</span>
+              </div>
+              <div id="t5" class="tl call later">
+                <span class="dot"></span><b>send_message</b
+                ><span class="arg">(channel: "#help")</span>
+              </div>
+              <div id="r5" class="tl res later">
+                <span class="elbow"></span>Sent
+              </div>
+
+              <div id="p5" class="tl p later">
+                <span class="pr">&gt;</span
+                ><span id="p5-text" class="typed"
+                  >Post it in Rust Learners #lounge too</span
+                >
+              </div>
+              <div id="t6" class="tl call later">
+                <span class="dot fail"></span><b>send_message</b
+                ><span class="arg">(channel: "#lounge")</span>
+              </div>
+              <div id="r6" class="tl res fail later">
+                <span class="elbow"></span>You are not allowed to do
+                send_message …<br />not in allowed guilds.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="fx"></div>
+        <div id="cursor">
+          <svg viewBox="0 0 34 40">
+            <path d="M3 2v31l8.5-8 5.5 12.5 5.5-2.4-5.4-12.3H29z" />
+          </svg>
+        </div>
+      </section>
+
+      <section
+        id="diagram"
+        class="clip"
+        data-start="3.6"
+        data-duration="5.8"
+        data-track-index="2"
+      >
+        <div id="diagram-inner">
+          <div class="flow">
+            <div id="n1" class="node">
+              <div class="node-ico" style="color: #89b4fa">
+                <svg viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path d="m7 9 3 3-3 3M13 15h4" />
+                </svg>
+              </div>
+              <div class="node-title">Your agent</div>
+              <div class="node-sub">Any MCP client</div>
+            </div>
+            <div class="link">
+              <span id="l1-label" class="link-label">bearer token</span>
+              <svg id="l1" viewBox="0 0 168 24">
+                <path d="M2 12h160M152 4l10 8-10 8" />
+              </svg>
+            </div>
+            <div id="n2" class="node">
+              <div class="node-ico" style="color: #cba6f7">
+                <svg viewBox="0 0 24 24">
+                  <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4" />
+                </svg>
+              </div>
+              <div class="node-title">MCPBridge</div>
+              <div class="node-sub">Vencord plugin in Vesktop</div>
+            </div>
+            <div class="link">
+              <span id="l2-label" class="link-label">Discord client code</span>
+              <svg id="l2" viewBox="0 0 168 24">
+                <path d="M2 12h160M152 4l10 8-10 8" />
+              </svg>
+            </div>
+            <div id="n3" class="node">
+              <div class="node-ico" style="color: #a6e3a1">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /></svg>
+              </div>
+              <div class="node-title">Discord page</div>
+              <div class="node-sub">Your signed-in session</div>
+            </div>
+          </div>
+          <div id="diagram-note">
+            <svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg>No bot
+            account, and the plugin never reads your Discord token
+          </div>
+        </div>
+      </section>
+
+      <div
+        id="captions"
+        class="clip"
+        data-start="4"
+        data-duration="40.4"
+        data-track-index="3"
+      >
+        <div id="c1" class="cap">
+          <span class="kicker">HOW IT WORKS</span>
+          <span class="cap-line"
+            >The endpoint runs inside Vesktop and uses its Discord session</span
+          >
+        </div>
+        <div id="c2" class="cap">
+          <span class="kicker">READ</span>
+          <span class="cap-line"
+            >Your agent reads servers, channels and messages</span
+          >
+        </div>
+        <div id="c3" class="cap">
+          <span class="kicker">THREADS</span>
+          <span class="cap-line"
+            >Active and archived threads, read page by page</span
+          >
+        </div>
+        <div id="c4" class="cap">
+          <span class="kicker">READ-ONLY</span>
+          <span class="cap-line"
+            >By default the agent cannot send, edit or delete</span
+          >
+        </div>
+        <div id="c5" class="cap">
+          <span class="kicker">SETTINGS</span>
+          <span class="cap-line"
+            >Allow only the servers you pick; DMs stay off</span
+          >
+        </div>
+        <div id="c6" class="cap">
+          <span class="kicker">SCOPE</span>
+          <span class="cap-line"
+            >Every call is checked against your settings before it reaches
+            Discord</span
+          >
+        </div>
+      </div>
+
+      <section
+        id="title-card"
+        class="clip card"
+        data-start="0"
+        data-duration="4.4"
+        data-track-index="4"
+      >
+        <div id="title-inner" class="card-inner">
+          <h1 id="title-mark" class="mark">vencord<em>-mcp</em></h1>
+          <p id="title-sub">An MCP endpoint inside your Discord client</p>
+          <div id="title-chips">
+            <span class="chip"
+              ><i style="background: #a6e3a1"></i>Read-only by default</span
+            >
+            <span class="chip"
+              ><i style="background: #89b4fa"></i>Server allowlist</span
+            >
+            <span class="chip"
+              ><i style="background: #cba6f7"></i>29 tools</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="end-card"
+        class="clip card"
+        data-start="43.6"
+        data-duration="4.4"
+        data-track-index="5"
+      >
+        <div class="card-inner">
+          <h1 id="end-mark" class="mark">vencord<em>-mcp</em></h1>
+          <ul id="end-list">
+            <li>
+              <svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg
+              >Read-only until you turn it off
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg>Only the
+              servers you allow; DMs off by default
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg>Uses
+              Vesktop's session, never your Discord token
+            </li>
+          </ul>
+          <div id="end-note">
+            Mock data for illustration · Not affiliated with Discord, Vencord or
+            Vesktop
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      document.fonts.ready.then(() => {
+        const root = document.getElementById("root");
+        const win = document.getElementById("win");
+        const fx = document.getElementById("fx");
+        const wfx = document.getElementById("wfx");
+        const origin = root.getBoundingClientRect();
+        const scale = origin.width / 1920;
+        // Positions in composition pixels, read before any tween moves the window.
+        const box = (sel) => {
+          const r = document.querySelector(sel).getBoundingClientRect();
+          return {
+            x: (r.left - origin.left) / scale,
+            y: (r.top - origin.top) / scale,
+            w: r.width / scale,
+            h: r.height / scale,
+          };
+        };
+        const point = (sel, fx = 0.5, fy = 0.5) => {
+          const b = box(sel);
+          return { x: b.x + b.w * fx, y: b.y + b.h * fy };
+        };
+        const at = {
+          gear: point("#gear"),
+          gid: point("#gid", 0.4),
+          ro: point("#ro-toggle"),
+          close: point("#close"),
+        };
+        // Rings live inside the window, so they follow it when it scales for the terminal.
+        // Window-relative, minus its border: absolute children sit inside the border.
+        const w = box("#win");
+        // pad is one number, or [x, y] for a row whose box has no side padding of its own.
+        const ringAt = (sel, pad, kind = "") => {
+          const [px, py] = Array.isArray(pad) ? pad : [pad, pad];
+          const b = box(sel);
+          const el = document.createElement("div");
+          el.className = `ring ${kind}`;
+          Object.assign(el.style, {
+            left: `${b.x - w.x - win.clientLeft - px}px`,
+            top: `${b.y - w.y - win.clientTop - py}px`,
+            width: `${b.w + px * 2}px`,
+            height: `${b.h + py * 2}px`,
+          });
+          wfx.append(el);
+          return el;
+        };
+        const rings = {
+          msgs: ringAt("#msgs-today", 10),
+          thread: ringAt("#thread-build", 3),
+          dms: ringAt("#set-dms", [14, -4]),
+          reply: ringAt("#m4", 10, "ok"),
+          rl: ringAt("#srv-rl", 5, "danger"),
+        };
+        const ripple = () => {
+          const el = document.createElement("div");
+          el.className = "ripple";
+          fx.append(el);
+          return el;
+        };
+
+        const tl = gsap.timeline({ paused: true });
+        const OUT = "power3.out";
+        const show = (target, t, from = { y: 14 }) =>
+          tl.fromTo(
+            target,
+            { opacity: 0, ...from },
+            { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.45, ease: OUT },
+            t,
+          );
+        const line = (sel, t) => show(sel, t, { y: 10 });
+        const type = (sel, t, duration) => {
+          const chars = document.querySelector(sel).textContent.length;
+          tl.fromTo(
+            sel,
+            { clipPath: "inset(0 100% 0 0)" },
+            { clipPath: "inset(0 0% 0 0)", duration, ease: `steps(${chars})` },
+            t,
+          );
+        };
+        const pulse = (el, t, hold = 1.6) => {
+          tl.fromTo(
+            el,
+            { opacity: 0, scale: 1.08 },
+            { opacity: 1, scale: 1, duration: 0.35 },
+            t,
+          );
+          tl.to(el, { opacity: 0, duration: 0.4 }, t + hold);
+        };
+        // The pointer tip sits at the element's top left corner.
+        const moveTo = (p, t, duration = 0.8) =>
+          tl.to(
+            "#cursor",
+            { x: p.x - 3, y: p.y - 2, duration, ease: "power2.inOut" },
+            t,
+          );
+        // A set, not a fromTo: a fromTo would paint the ripple at its start state before t.
+        const click = (p, t) => {
+          const el = ripple();
+          tl.set(el, { x: p.x - 28, y: p.y - 28, scale: 0.3, opacity: 0.9 }, t);
+          tl.to(
+            el,
+            { scale: 1.5, opacity: 0, duration: 0.5, ease: "power2.out" },
+            t,
+          );
+          tl.to("#cursor", { scale: 0.88, duration: 0.08 }, t);
+          tl.to("#cursor", { scale: 1, duration: 0.12 }, t + 0.08);
+        };
+        // The window shares the screen with the terminal at this size and spot.
+        const SIDE = { x: 112, scale: 0.72 };
+
+        // 0 s: title
+        show("#title-mark", 0.2, { y: 40 });
+        show("#title-sub", 0.6, { y: 24 });
+        tl.fromTo(
+          "#title-chips .chip",
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.5, ease: OUT, stagger: 0.12 },
+          1.0,
+        );
+        tl.to(
+          "#title-inner",
+          { opacity: 0, y: -30, duration: 0.6, ease: "power2.in" },
+          3.4,
+        );
+
+        // 4 s: how it works
+        show("#n1", 4.0, { y: 24 });
+        tl.fromTo(
+          "#l1",
+          { clipPath: "inset(0 100% 0 0)" },
+          { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "power2.inOut" },
+          4.5,
+        );
+        show("#l1-label", 4.6, { y: 8 });
+        show("#n2", 4.9, { y: 24 });
+        tl.fromTo(
+          "#l2",
+          { clipPath: "inset(0 100% 0 0)" },
+          { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "power2.inOut" },
+          5.4,
+        );
+        show("#l2-label", 5.5, { y: 8 });
+        show("#n3", 5.8, { y: 24 });
+        show("#diagram-note", 6.6, { y: 16 });
+        tl.to(
+          "#diagram-inner",
+          { opacity: 0, y: -24, duration: 0.5, ease: "power2.in" },
+          8.3,
+        );
+
+        // 8.9 s: the client, then the agent reads it through MCP
+        tl.fromTo(
+          "#win",
+          { opacity: 0, y: 70, scale: 0.96 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: OUT },
+          8.9,
+        );
+        tl.set("#cursor", { opacity: 0, x: 900, y: 720 }, 0);
+        tl.to("#win", { ...SIDE, duration: 0.9, ease: "power2.inOut" }, 10.4);
+        show("#term", 10.9, { x: -90, y: 0 });
+        type("#p1-text", 11.5, 1.6);
+        line("#t1", 13.4);
+        line("#r1", 14.0);
+        pulse(rings.msgs, 14.1, 2.6);
+        line("#a1", 15.0);
+
+        // 18.5 s: threads
+        line("#p2", 18.6);
+        type("#p2-text", 18.7, 1.4);
+        line("#t2", 20.4);
+        line("#r2", 20.9);
+        pulse(rings.thread, 21.0, 2.2);
+        line("#t3", 21.9);
+        line("#r3", 22.5);
+
+        // 24 s: read-only refuses the send
+        line("#p3", 24.1);
+        type("#p3-text", 24.2, 1.5);
+        line("#t4", 26.0);
+        line("#r4", 26.6);
+
+        // 29 s: settings: allow one server, turn read-only off, DMs stay off
+        tl.to(
+          "#term",
+          { opacity: 0, x: -90, duration: 0.6, ease: "power2.in" },
+          29.0,
+        );
+        tl.to(
+          "#win",
+          { x: 0, scale: 1, duration: 0.9, ease: "power2.inOut" },
+          29.1,
+        );
+        tl.to("#cursor", { opacity: 1, duration: 0.3 }, 29.9);
+        moveTo(at.gear, 30.0);
+        click(at.gear, 30.9);
+        tl.set(".modal-wrap", { visibility: "visible" }, 31.0);
+        tl.fromTo(
+          "#backdrop",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.25 },
+          31.0,
+        );
+        // The modal comes in over the finished backdrop and leaves before it, so it never
+        // sits on visible page text.
+        tl.set(".page", { visibility: "hidden" }, 31.2);
+        show("#modal", 31.2, { y: 12, scale: 0.97 });
+        moveTo(at.gid, 31.5);
+        click(at.gid, 32.4);
+        tl.to("#gid", { borderColor: "#cba6f7", duration: 0.15 }, 32.4);
+        type("#gid-text", 32.6, 1.2);
+        moveTo(at.ro, 34.0, 0.7);
+        click(at.ro, 34.8);
+        tl.to("#ro-knob", { x: -22, duration: 0.2 }, 34.85);
+        tl.to(
+          "#ro-toggle",
+          { backgroundColor: "#585b70", duration: 0.2 },
+          34.85,
+        );
+        pulse(rings.dms, 35.3, 1.4);
+        moveTo(at.close, 35.6, 0.7);
+        click(at.close, 36.4);
+        tl.to("#modal", { opacity: 0, duration: 0.2 }, 36.45);
+        tl.set(".page", { visibility: "visible" }, 36.65);
+        tl.to("#backdrop", { opacity: 0, duration: 0.25 }, 36.65);
+        tl.set(".modal-wrap", { visibility: "hidden" }, 36.9);
+        tl.to("#cursor", { opacity: 0, duration: 0.3 }, 36.8);
+
+        // 37 s: the send goes through; another server is still out of scope
+        // While the terminal is hidden, the read lines go so the refusal is the first line.
+        tl.set("#term .earlier", { display: "none" }, 36.9);
+        tl.set("#term .later", { display: "block" }, 36.9);
+        tl.set("#p3", { marginTop: 0 }, 36.9);
+        tl.to("#win", { ...SIDE, duration: 0.8, ease: "power2.inOut" }, 36.9);
+        tl.to("#term", { opacity: 1, x: 0, duration: 0.45, ease: OUT }, 37.5);
+        line("#p4", 37.7);
+        type("#p4-text", 37.8, 0.9);
+        line("#t5", 38.8);
+        line("#r5", 39.3);
+        show("#m4", 39.4, { y: 18, scale: 0.97 });
+        pulse(rings.reply, 39.7, 1.6);
+        line("#p5", 40.3);
+        type("#p5-text", 40.4, 1.2);
+        line("#t6", 41.7);
+        line("#r6", 42.2);
+        pulse(rings.rl, 42.3, 1.0);
+        tl.to(
+          ["#win", "#term"],
+          { opacity: 0, y: 20, duration: 0.7, ease: "power2.in" },
+          43.3,
+        );
+
+        // Captions
+        for (const [sel, start, end] of [
+          ["#c1", 4.4, 8.8],
+          ["#c2", 9.4, 18.2],
+          ["#c3", 18.5, 23.9],
+          ["#c4", 24.0, 28.9],
+          ["#c5", 29.3, 36.9],
+          ["#c6", 37.2, 43.3],
+        ]) {
+          show(sel, start);
+          tl.to(sel, { opacity: 0, duration: 0.35 }, end - 0.35);
+        }
+
+        // 43.6 s: end card
+        show("#end-mark", 44.0, { y: 30 });
+        tl.fromTo(
+          "#end-list li",
+          { opacity: 0, x: -20 },
+          { opacity: 1, x: 0, duration: 0.45, ease: OUT, stagger: 0.18 },
+          44.6,
+        );
+        tl.fromTo(
+          "#end-note",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.5 },
+          45.8,
+        );
+
+        window.__timelines["vencord-mcp-demo"] = tl;
+      });
+    </script>
+  </body>
+</html>

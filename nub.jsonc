@@ -1,0 +1,6 @@
+{
+  "install": {
+    // Supply-chain gate: refuse any package version younger than two weeks.
+    "minimumReleaseAge": "14d",
+  },
+}
